@@ -1,4 +1,132 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# Prayer Times 🕌
+
+A React Native app (Android + iOS) for daily prayer times, the Islamic (Hijri) calendar and weather — English UI with Roman-Urdu hints.
+
+## Features
+
+- **Home** — mosque header with today's Hijri + Gregorian date and the location meta line (**Bulandi 1338 ft · GMT +5.0**), a **NOW / NEXT card**, and the full prayer table showing **both the start (adhan) and end time** of every prayer. Below that: current weather, hourly strip and a 7-day forecast. Pull-to-refresh.
+- **NOW / NEXT card** — one merged timeline of prayers *and* the day's other events, so the section behaves like a Pakistani app: after Fajr it shows **Talu-e-Aftab** next, then **Ishraq**, **Duha-e-Sughra / Duha-e-Kubra**, **Zawal (Makrooh)**, **Dhuhr**… The big countdown runs to the end of whatever is running and says so — e.g. `04:11:23` under **"Zuhr ka waqt khatam hone mein"** — with a `NEXT` line for what takes over, and a progress bar from the current entry to that moment. Before Fajr the card simply reads `NEXT · Fajr`; after midnight the night markers (**Nisf al-Layl**, **Aakhri third**) are what is running — they are calculated from the night length (Aladhan's `Midnight` / `Lastthird` as fallback).
+- **Islamic Calendar** — browse any Hijri month, tap to pick from all 12 Islamic months and a year, see the matching Gregorian dates and highlight today.
+- **Settings** — one search box with **live place suggestions**: type `Jhang` and a list appears (`Jhang — Jhang District, Punjab, Pakistan`, `Jhang — Attock District, …`), tap one and it is saved. Or use the one-tap auto-detect button (GPS first, city-level IP fallback).
+- **Location is auto-detected on first launch** — the app asks for GPS once and, if that is refused, falls back to an IP-based city lookup, so prayer times work without any setup.
+- **Prayer calculation is fixed** — the **Karachi (University of Islamic Sciences)** method, i.e. Fajr 18° / Isha 18°, which is what mosques and Pakistani prayer apps use, plus **always Hanafi Asr** (`school = 1`: shadow = 2× object). No method picker to get confused by.
+- **The times themselves are calculated in the app, with seconds** — `solarTimes.js` runs the solar maths (declination + equation of time → hour angles), so the table reads `4:45:32` instead of Aladhan's rounded `04:46`, and sunrise/Maghrib use an **elevation-corrected horizon** (`0.833° + 0.0347·√metres`, elevation cached from Open-Meteo): Jhang sits 161 m up, so sunrise is `6:04:22`, not a flat-horizon `6:06`. Aladhan still supplies the Hijri date, the timezone anchor and the fallback minutes — a calculated time is only adopted when it lands within **30 minutes** of the timetable (real horizon/coordinate differences are ±2 min; a broken timezone or coordinate lands hours away).
+- **A whole year on the phone, offline-friendly** — one pull-to-refresh downloads all 12 months for your location. Every later open syncs quietly in the background: missing months are filled, data older than 30 days is re-downloaded, fresh data is left alone. No internet? Nothing is fetched, the saved times stay on screen, and a note says `Internet nahi mila — saved (purana) data dikha rahe hain`.
+
+## Theming & icons
+
+- Emerald green + gold Islamic theme, defined once in `src/Components/theme.js`.
+- Ornamental dividers and geometric pattern bands are drawn with plain Views (`src/Components/Ornament.jsx`) — no image assets.
+- All icons come from **react-native-vector-icons** (`MaterialCommunityIcons`), wrapped in `src/Components/icons.jsx`.
+- Screens use `useSafeAreaInsets()` from `react-native-safe-area-context` for top/bottom insets.
+
+> After pulling these changes run `npm install`, then rebuild — on iOS also `bundle exec pod install`.
+
+## APIs (all free, no API key)
+
+| Purpose | Service |
+| --- | --- |
+| Timetable, Hijri dates (clock times calculated in-app) | [Aladhan API](https://aladhan.com/prayer-times-api) |
+| Place search (live suggestions) | [Photon](https://photon.komoot.io) (OpenStreetMap) |
+| Place search fallback | [Open-Meteo Geocoding](https://open-meteo.com/en/docs/geocoding-api) |
+| Weather forecast + site elevation | [Open-Meteo Forecast](https://open-meteo.com/en/docs) |
+| Reverse geocoding (GPS) | BigDataCloud reverse-geocode-client |
+| Last-resort location (IP) | ipwho.is |
+
+Monthly prayer timetables and Hijri months are cached in `AsyncStorage`, so each month costs a single network request per location (cache keys include method + Asr school, so settings changes never show stale times).
+
+**Offline / yearly sync.** `syncYear()` pulls a full year one month at a time (3 requests in flight) and records completion in a per-location `@pt/meta/…` key; `syncIfNeeded()` decides what to do: missing months → fill them, meta older than 30 days → refresh everything, `force: true` (pull-to-refresh or the header refresh button) → re-download regardless, otherwise nothing. It throws only when nothing could be downloaded, so the Home screen can fall back to the saved timetable and show a note instead of an empty screen. The cache keeps the current location's **entire year**, trims other locations to the current month (a city switch still shows today's times) and drops old years — including their metas — on the next write. Two callers asking for the same month (today + tomorrow) share a single in-flight request. The Calendar's Hijri months are cached as you visit them.
+
+## Project structure
+
+```
+src/
+  Components/        TabBar, shared UI (Card, buttons, chips), icons, ornaments, theme
+  Screens/
+    index.jsx        App shell: loading state + bottom tabs (Home / Calendar / Settings)
+    Frontend/
+      index.jsx      Home (NOW/NEXT card, meta line, prayer table with start+end, weather)
+      Calendar/      Islamic month browser
+      Settings/      Location search (live suggestions), auto-detect
+    Services/
+      prayerTimes.js Aladhan timetable (Karachi method, Hanafi Asr), Hijri calendar, normalisers,
+                     day events (Talu-e-Aftab, Ishraq, Duha, zawal…) + computeNextItem
+                     (merged now/next timeline behind the countdown card),
+                     yearly offline sync (syncYear / syncIfNeeded)
+      solarTimes.js  In-app prayer-time maths: seconds for every prayer and an
+                     elevation-corrected horizon for sunrise/sunset
+      elevation.js   Cached site elevation (Open-Meteo) for that horizon
+      weather.js     Open-Meteo fetch, WMO codes, elevation/GMT helpers
+      geocode.js     Place search (Photon → Open-Meteo), reverse geocode, GPS/IP auto-detect, labels
+      location.js    GPS permission + coordinates
+      locationStorage.js
+  utils/date.js      Time parsing (HH:MM:SS), 12-hour format, countdown, timezone clock, shiftMinutes
+```
+
+## Aladhan response shapes (careful!)
+
+The three endpoints do **not** agree on their shape — everything is normalised in
+`src/Screens\Services/prayerTimes.js`:
+
+| Endpoint | Item shape |
+| --- | --- |
+| `/calendar/{year}/{month}` | `{ timings, date: { hijri, gregorian }, meta }` |
+| `/hToGCalendar/{month}/{year}` | `{ hijri, gregorian }` — **no `date` wrapper** |
+| `/gToH/{dd-mm-yyyy}` | `{ hijri, gregorian }` — we return `.hijri` only |
+
+Assuming the wrong shape crashes the screen; `__tests__/calendarDebug.test.js`
+guards against a regression.
+
+## Why timings can differ from another prayer app
+
+Prayer times depend on three things. Two of them commonly differ between apps:
+
+| Factor | This app | Typical Pakistani app |
+| --- | --- | --- |
+| Calculation method | **Karachi** (Fajr 18°, Isha 18°) | Karachi — matched (Isha is the visible one: with MWL's 17° it was 4 min early) |
+| Asr opinion | Hanafi (2× shadow) | Hanafi — matched |
+| Coordinates | GPS, or the point returned for the searched place | Their own GPS point / city centre |
+| Sunrise & Maghrib model | elevation-corrected horizon (`0.833° + 0.0347·√m`) | some apps use a flat horizon → **±1–2 min on sunrise/Maghrib only** |
+| Display precision | seconds (`4:45:32`) | Aladhan-style apps round to minutes (`04:46`) |
+
+Dhuhr (solar noon) is the least sensitive value: if Dhuhr matches to the second
+but sunrise/Maghrib are 1–2 minutes apart, it is the horizon model or a slightly
+different coordinate — not a wrong location.
+
+**Known quirk — Asr:** Aladhan's own service samples the sun's declination a
+day late inside its Asr calculation (`asrTime()` in their PHP library), which is
+why their Asr sits ~1 minute after the standard value — `adhan-js` agrees with
+this app to a couple of seconds. Everything else agrees with Aladhan within the
+±30 s of their minute rounding.
+
+The event windows in the NOW/NEXT card are conventional (they are not
+astronomy):
+
+| Event | Rule used |
+| --- | --- |
+| Talu-e-Aftab | sunrise, as calculated |
+| Ishraq | sunrise + 20 min |
+| Duha-e-Sughra | `[sunrise + 20 min, ¼ of daylight]` |
+| Duha-e-Kubra | `[¼ of daylight, Dhuhr − 10 min]` |
+| Zawal (Makrooh) | `[Dhuhr − 10 min, Dhuhr]` — avoid nafl here |
+| Nisf al-Layl / Aakhri third | sunset + ½ night / sunset + ⅔ night (Aladhan's `Midnight` / `Lastthird` as fallback) |
+
+## Checks
+
+```sh
+npm test        # Jest (App render + prayer/time logic)
+npm run lint    # ESLint
+npx tsc --noEmit
+```
+
+## Native icon font setup (already configured here)
+
+- **Android**: `android/app/build.gradle` applies `react-native-vector-icons/fonts.gradle` and copies only `MaterialCommunityIcons.ttf`.
+- **iOS**: `Info.plist` → `UIAppFonts` lists `MaterialCommunityIcons.ttf` (run `bundle exec pod install` after changing).
+
+---
+
+The rest of this file is the original React Native CLI boilerplate.
 
 # Getting Started
 
