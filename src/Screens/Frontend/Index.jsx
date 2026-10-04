@@ -286,12 +286,6 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
         {error ? (
           <Text style={styles.inlineError}>{t(error.key, error.params)}</Text>
         ) : null}
-
-        {/* IP-based location: shehar internet provider wala ho sakta hai —
-            chhota sa aagah kar dein ke waqt andazay ke hain. */}
-        {location.type === 'ip' ? (
-          <Text style={styles.inlineError}>{t('home.approxLocation')}</Text>
-        ) : null}
       </Card>
 
       {/* ---------- Now + Next: a prayer OR a day event (Talu-e-Aftab…) ---------- */}
@@ -512,8 +506,8 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
         </Card>
       )}
 
-      <Text style={styles.source}>{t('home.source')}</Text>
-      <View style={{ height: spacing.xl }} />
+      {/* <Text style={styles.source}>{t('home.source')}</Text> */}
+      {/* <View style={{ height: spacing.xl }} /> */}
     </ScrollView>
   )
 }

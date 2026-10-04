@@ -259,17 +259,17 @@ test('Roman Urdu mode speaks the legacy captions and headings again', async () =
   }
 })
 
-test('an IP location carries the "times are approximate" warning', async () => {
+test('an IP (approximate) location shows no warning — that feature is gone', async () => {
+  // Auto-detect ab sirf GPS hai; purana IP-wala save data ho to bhi koi
+  // "approximate" banner nahi dikhta.
   await withHome(
     async (renderer) => {
-      expect(renderedText(renderer)).toContain(
-        'Location is approximate — set GPS or search your city in Settings.',
-      )
+      expect(renderedText(renderer)).not.toContain('Location is approximate')
     },
     { type: 'ip', latitude: 30.0, longitude: 71.0, label: 'Pakistan' },
   )
 
-  // aam (GPS/manual) jagah par ye warning nahi
+  // aam (GPS/manual) jagah par bhi wahi — kabhi nahi
   const normal = await renderHome()
   expect(normal).not.toContain('Location is approximate')
 })

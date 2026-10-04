@@ -187,30 +187,27 @@ export async function normalizeLocation(saved) {
 /* Auto detection                                                      */
 /* ------------------------------------------------------------------ */
 
+/* ------------------------------------------------------------------ */
+/* GPS / permission issue                                              */
+/* ------------------------------------------------------------------ */
+
 /**
- * Last-resort auto detection: approximate city from the device's public IP.
- * Free, no API key (https://ipwho.is).
+ * PositionError codes (geolocation): 1 = permission denied, 2 = position
+ * unavailable, 3 = timeout — dono aksar tab jab Location/GPS band ho.
+ * Ye batata hai ke settings ka kaun sa page khulna chahiye.
  */
-export async function detectLocationByIp() {
-  const json = await getJson('https://ipwho.is/')
-
-  if (!json || json.success === false || typeof json.latitude !== 'number') {
-    throw new Error(t('err.ipDetect'))
-  }
-
-  return {
-    type: 'ip',
-    latitude: json.latitude,
-    longitude: json.longitude,
-    label: buildLabel([json.city, json.country]),
-    city: json.city,
-    country: json.country,
-  }
+function locationIssue(error) {
+  const code = error && typeof error.code === 'number' ? error.code : null
+  if (code === 1) return 'permission'
+  if (code === 2 || code === 3) return 'gps'
+  return null
 }
 
 /**
- * Auto-detect the user's location: precise GPS first, city-level IP lookup
- * if the permission is refused or GPS is unavailable.
+ * Auto-detect the user's location: precise GPS only — approximate (IP)
+ * location poori tarah khatam hai. GPS/permission fail ho to `{ issue }`
+ * lauta hai, aur screen theme wala modal dikha kar settings kholne ko
+ * kehti hai (ya user khud shehar search kar sakta hai).
  */
 export async function detectLocationAutomatically() {
   try {
@@ -231,7 +228,8 @@ export async function detectLocationAutomatically() {
       return { type: 'gps', latitude, longitude }
     }
   } catch (e) {
-    return await detectLocationByIp()
+    // Bina code wali ghalati bhi GPS issue hi hai — modal wahi dikhata hai.
+    return { issue: locationIssue(e) || 'gps' }
   }
 }
 

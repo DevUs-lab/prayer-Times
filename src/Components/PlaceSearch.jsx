@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
+import { ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native'
 
 import Icon, { ICONS } from './icons'
 import { colors, radius, spacing } from './theme'
@@ -127,29 +127,40 @@ export default function PlaceSearch({ onChoose, disabled }) {
 
       {searching ? <Text style={styles.statusText}>{t('set.searching')}</Text> : null}
 
-      {suggestions.map((place) => {
-        const key = `${place.latitude.toFixed(4)}|${place.longitude.toFixed(4)}|${place.label}`
-        return (
-          <TouchableOpacity
-            key={key}
-            style={styles.suggestionRow}
-            onPress={() => choose(place)}
-            activeOpacity={0.7}
-            disabled={disabled}
-          >
-            <Icon name={ICONS.place} size={18} color={colors.gold} />
-            <View style={styles.suggestionText}>
-              <Text style={styles.suggestionTitle} numberOfLines={1}>
-                {place.name}
-              </Text>
-              <Text style={styles.suggestionSub} numberOfLines={2}>
-                {place.secondary}
-              </Text>
-            </View>
-            <Icon name={ICONS.chevronRight} size={18} color={colors.textMuted} />
-          </TouchableOpacity>
-        )
-      })}
+      {/* Suggestions lambi ho to list khud scroll ho — keyboard khula rahe
+          tab bhi aakhri tak pahuncha ja sake (minimize karne ki zaroorat nahi). */}
+      {suggestions.length > 0 ? (
+        <ScrollView
+          style={styles.suggestions}
+          keyboardShouldPersistTaps="handled"
+          nestedScrollEnabled
+          showsVerticalScrollIndicator={false}
+        >
+          {suggestions.map((place) => {
+            const key = `${place.latitude.toFixed(4)}|${place.longitude.toFixed(4)}|${place.label}`
+            return (
+              <TouchableOpacity
+                key={key}
+                style={styles.suggestionRow}
+                onPress={() => choose(place)}
+                activeOpacity={0.7}
+                disabled={disabled}
+              >
+                <Icon name={ICONS.place} size={18} color={colors.gold} />
+                <View style={styles.suggestionText}>
+                  <Text style={styles.suggestionTitle} numberOfLines={1}>
+                    {place.name}
+                  </Text>
+                  <Text style={styles.suggestionSub} numberOfLines={2}>
+                    {place.secondary}
+                  </Text>
+                </View>
+                <Icon name={ICONS.chevronRight} size={18} color={colors.textMuted} />
+              </TouchableOpacity>
+            )
+          })}
+        </ScrollView>
+      ) : null}
 
       {searched && !searching && suggestions.length === 0 ? (
         <Text style={styles.statusText}>{t('set.noResults')}</Text>
@@ -185,6 +196,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginTop: spacing.m,
     textAlign: 'center',
+  },
+  suggestions: {
+    // ~4 rows dikhti hain, usse lambi list andar hi scroll hoti hai.
+    maxHeight: spacing.xxl * 10, // 320
   },
   suggestionRow: {
     flexDirection: 'row',

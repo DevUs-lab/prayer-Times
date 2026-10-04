@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
-import { Card, PrimaryButton, SectionTitle } from '../../../Components/ui'
+import { Card, LocationIssueModal, PrimaryButton, SectionTitle } from '../../../Components/ui'
 import { PatternBand } from '../../../Components/Ornament'
 import Icon, { ICONS } from '../../../Components/icons'
 import { colors, radius, spacing } from '../../../Components/theme'
@@ -27,6 +27,8 @@ export default function SettingsScreen({ location, onSaved }) {
   // Error par tick nahi dikhta — X (lal). Ye flag sirf messageBox ka hai.
   const [messageIsError, setMessageIsError] = useState(false)
   const [busy, setBusy] = useState(null)
+  // GPS/permission fail → theme wala modal (service `{ issue }` lauta hai)
+  const [locationIssue, setLocationIssue] = useState(null)
 
   const show = (key, isError = false, params) => {
     setMessage(key)
@@ -66,15 +68,15 @@ export default function SettingsScreen({ location, onSaved }) {
     show('')
     try {
       const next = await detectLocationAutomatically()
+      if (next.issue) {
+        // GPS/permission band — modal batata hai ke settings kholein
+        setLocationIssue(next.issue)
+        return
+      }
       await saveLocation(next)
       getElevation(next.latitude, next.longitude).catch(() => {})
       onSaved(next)
-      if (next.type === 'ip') {
-        // IP se mila — shehar internet provider wala ho sakta hai (100+ km)
-        show('home.approxLocation', true)
-      } else {
-        show('set.detected', false, { label: locationLabel(next) })
-      }
+      show('set.detected', false, { label: locationLabel(next) })
     } catch (e) {
       show('set.detectFailed', true)
     } finally {
@@ -172,6 +174,14 @@ export default function SettingsScreen({ location, onSaved }) {
           <Text style={styles.message}>{t(message, messageParams)}</Text>
         </View>
       ) : null}
+
+      {/* GPS/permission issue: app ka apna themed modal (system Alert nahi).
+          Settings se wapas aane par onRetry khud dobara detect karta hai. */}
+      <LocationIssueModal
+        issue={locationIssue}
+        onClose={() => setLocationIssue(null)}
+        onRetry={autoDetect}
+      />
     </ScrollView>
   )
 }

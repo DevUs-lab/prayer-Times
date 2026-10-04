@@ -1,9 +1,9 @@
-import React, { useState } from 'react'
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { Keyboard, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import Icon, { ICONS } from '../../Components/icons'
-import { Card, PrimaryButton } from '../../Components/ui'
+import { Card, LocationIssueModal, PrimaryButton } from '../../Components/ui'
 import { colors, radius, spacing } from '../../Components/theme'
 import PlaceSearch from '../../Components/PlaceSearch'
 import { LANGS, rtlStyle, useLang } from '../../i18n'
@@ -75,12 +75,38 @@ export function LocationStep({ onDone, onSkip }) {
   const [mode, setMode] = useState('choose')
   const [busy, setBusy] = useState(null)
   const [failed, setFailed] = useState(false)
+  // GPS/permission fail → theme wala modal (service `{ issue }` lauta hai)
+  const [locationIssue, setLocationIssue] = useState(null)
+  // Keyboard viewport ke neeche chala jata hai (edge-to-edge), isliye keyboard
+  // barabar jagah neeche reserve karte hain — warna suggestion list ke aakhri
+  // items keyboard ke peechhe chhap jate hain aur scroll se bhi nahi milte.
+  const [keyboardHeight, setKeyboardHeight] = useState(0)
+
+  useEffect(() => {
+    // RN ka event `endCoordinates` par aata hai — purana `event.end.height`
+    // undefined par crash karta tha ("cannot read property 'height' of
+    // undefined"), keyboardHeight 0 reh jata tha aur keyboard ke peeche
+    // content chhapa rehta tha.
+    const shown = Keyboard.addListener('keyboardDidShow', (event) =>
+      setKeyboardHeight(event?.endCoordinates?.height ?? 0),
+    )
+    const hidden = Keyboard.addListener('keyboardDidHide', () => setKeyboardHeight(0))
+    return () => {
+      shown.remove()
+      hidden.remove()
+    }
+  }, [])
 
   const autoDetect = async () => {
     setBusy('auto')
     setFailed(false)
     try {
       const next = await detectLocationAutomatically()
+      if (next.issue) {
+        // GPS/permission band — modal batata hai ke settings kholein
+        setLocationIssue(next.issue)
+        return
+      }
       await saveLocation(next)
       // Unchai save hote hi cache — pehla download offline ho to bhi
       // sunrise/Maghrib sahi nikle. (await nahi: ye raasta nahi rokta.)
@@ -110,7 +136,12 @@ export function LocationStep({ onDone, onSkip }) {
   return (
     <ScrollView
       style={styles.screen}
-      contentContainerStyle={[styles.centered, { paddingTop: insets.top + spacing.xl }]}
+      contentContainerStyle={[
+        styles.centered,
+        // Keyboard ke barabar extra jagah: aakhri suggestion scroll kar ke
+        // keyboard ke theek oopar aa jati hai.
+        { paddingTop: insets.top + spacing.xl, paddingBottom: spacing.xxl + keyboardHeight },
+      ]}
       keyboardShouldPersistTaps="handled"
     >
       <Icon name={ICONS.place} size={46} color={colors.gold} />
@@ -143,6 +174,14 @@ export function LocationStep({ onDone, onSkip }) {
       <Pressable onPress={onSkip} hitSlop={8} accessibilityRole="button">
         <Text style={styles.skip}>{t('ob.loc.skip')}</Text>
       </Pressable>
+
+      {/* GPS/permission issue: app ka apna themed modal (system Alert nahi).
+          Settings se wapas aane par onRetry khud dobara detect karta hai. */}
+      <LocationIssueModal
+        issue={locationIssue}
+        onClose={() => setLocationIssue(null)}
+        onRetry={autoDetect}
+      />
     </ScrollView>
   )
 }

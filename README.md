@@ -34,7 +34,6 @@ A React Native app (Android + iOS) for daily prayer times, the Islamic (Hijri) c
 | Place search fallback | [Open-Meteo Geocoding](https://open-meteo.com/en/docs/geocoding-api) |
 | Weather forecast + site elevation | [Open-Meteo Forecast](https://open-meteo.com/en/docs) |
 | Reverse geocoding (GPS) | BigDataCloud reverse-geocode-client |
-| Last-resort location (IP) | ipwho.is |
 
 Monthly prayer timetables and Hijri months are cached in `AsyncStorage`, so each month costs a single network request per location (cache keys include method + Asr school, so settings changes never show stale times).
 

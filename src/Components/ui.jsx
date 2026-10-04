@@ -1,8 +1,17 @@
-import React from 'react'
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native'
+import React, { useEffect, useRef } from 'react'
+import {
+  ActivityIndicator,
+  AppState,
+  Modal,
+  Pressable,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native'
 import Icon, { ICONS } from './icons'
 import { colors, radius, shadow, spacing } from './theme'
 import { rtlStyle, useLang } from '../i18n'
+import { openLocationSettings } from '../Screens/Services/location'
 
 export function Card({ style, children }) {
   return <View style={[styles.card, style]}>{children}</View>
@@ -90,6 +99,66 @@ export function LocationPrompt({ onPress }) {
       <Text style={[styles.stateHint, rtlStyle(lang)]}>{t('ui.loc.hint')}</Text>
       <PrimaryButton title={t('ui.loc.button')} icon={ICONS.settings} onPress={onPress} />
     </View>
+  )
+}
+
+/**
+ * GPS/permission fail hone par aane wala modal — Settings aur Onboarding
+ * dono yahi lagate hain. System Alert nahi: app ke emerald/gold theme ke
+ * mutabiq (Calendar wali sheet ki tarah). "Open settings" sahi page kholti
+ * hai aur wapas aate hi `onRetry` se khud dobara detect hota hai; "Close"
+ * band kar deta hai (kuch save nahi hota — user khud shehar search kar
+ * sakta hai).
+ */
+export function LocationIssueModal({ issue, onClose, onRetry }) {
+  const { t, lang } = useLang()
+  // "Open settings" daba kar gaye ho to wapas aate hi dobara detect chale.
+  // ("Close" par pending nahi banta — manually chuni hui jagah badli na jaye.)
+  const pendingRef = useRef(false)
+  const retryRef = useRef(onRetry)
+  retryRef.current = onRetry
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active' && pendingRef.current) {
+        pendingRef.current = false
+        if (retryRef.current) retryRef.current()
+      }
+    })
+    return () => subscription.remove()
+  }, [])
+
+  const openSettings = () => {
+    pendingRef.current = true
+    openLocationSettings(issue)
+    onClose()
+  }
+
+  return (
+    <Modal
+      visible={Boolean(issue)}
+      transparent
+      animationType="fade"
+      onRequestClose={onClose}
+    >
+      <Pressable style={styles.backdrop} onPress={onClose}>
+        <Pressable style={styles.dialog} onPress={() => {}}>
+          <Icon name={ICONS.crosshair} size={34} color={colors.gold} />
+          <Text style={styles.dialogTitle}>{t('loc.issue.title')}</Text>
+          <Text style={[styles.dialogText, rtlStyle(lang)]}>{t('loc.issue.msg')}</Text>
+          <View style={styles.dialogActions}>
+            <PrimaryButton
+              title={t(issue === 'permission' ? 'loc.openApp' : 'loc.openGps')}
+              icon={ICONS.settings}
+              onPress={openSettings}
+            />
+          </View>
+          <Pressable onPress={onClose} hitSlop={8} accessibilityRole="button">
+            <Text style={styles.dialogDismiss}>{t('common.close')}</Text>
+          </Pressable>
+        </Pressable>
+      </Pressable>
+    </Modal>
   )
 }
 
@@ -192,5 +261,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     lineHeight: 20,
+  },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(4, 26, 19, 0.72)',
+    justifyContent: 'center',
+    padding: spacing.xl,
+  },
+  dialog: {
+    backgroundColor: colors.card,
+    borderRadius: radius.l,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.xl,
+    gap: spacing.m,
+    alignItems: 'center',
+    ...shadow,
+  },
+  dialogTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: colors.gold,
+    textAlign: 'center',
+    letterSpacing: 0.5,
+  },
+  dialogText: {
+    fontSize: 14,
+    color: colors.textMuted,
+    textAlign: 'center',
+    lineHeight: 21,
+  },
+  dialogActions: {
+    alignSelf: 'stretch',
+  },
+  dialogDismiss: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.textFaint,
+    paddingVertical: spacing.s,
   },
 })

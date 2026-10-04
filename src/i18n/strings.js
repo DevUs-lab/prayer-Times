@@ -94,7 +94,6 @@ const en = {
   'home.weather.hilo': 'H {{max}}°  L {{min}}°',
   'home.elevation': 'Elevation {{ft}} ft',
   'home.source': 'Prayer times: Aladhan · Weather: Open-Meteo',
-  'home.approxLocation': 'Location is approximate — set GPS or search your city in Settings.',
 
   /* ---- countdown sentence: "${name} ends in 04:11:23" ---- */
   'caption.endsIn': '{{name}} ends in',
@@ -136,6 +135,12 @@ const en = {
   'set.saveFailed': 'Location not saved — try again',
   'set.detected': 'Location found: {{label}}',
   'set.detectFailed': 'Could not detect — allow permission or type it in',
+  /* auto-detect: GPS/permission band ho to poochein */
+  'loc.issue.title': 'Location not available',
+  'loc.issue.msg':
+    'No GPS location yet — turn Location (GPS) on and allow the permission, then try again. You can also search your city by name.',
+  'loc.openGps': 'Open GPS settings',
+  'loc.openApp': 'Open app settings',
   'set.type.gps': 'GPS (auto detected)',
   'set.type.ip': 'IP (auto detected)',
   'set.type.manual': 'Manual',
@@ -162,7 +167,6 @@ const en = {
   'err.http': 'Request failed ({{status}})',
   'err.network': 'No internet connection',
   'err.geocode': 'Place not found — check the city name',
-  'err.ipDetect': 'Could not detect location',
 
   /* ---- weather ---- */
   'weather.unavailable': 'Weather unavailable',
@@ -240,7 +244,6 @@ const ur = {
   'home.weather.hilo': 'زیادہ {{max}}°  کم {{min}}°',
   'home.elevation': 'بلندی {{ft}} فٹ',
   'home.source': 'نماز کے اوقات: Aladhan · موسم: Open-Meteo',
-  'home.approxLocation': 'جگہ اندازے سے لی گئی ہے — سیٹنگز میں GPS یا شہر خود چنیں۔',
 
   'caption.endsIn': '{{name}} کا وقت ختم ہونے میں',
 
@@ -278,6 +281,12 @@ const ur = {
   'set.saveFailed': 'جگہ محفوظ نہ ہو سکی — دوبارہ کوشش کریں',
   'set.detected': 'جگہ ملی: {{label}}',
   'set.detectFailed': 'تلاش نہ ہو سکی — اجازت دیں یا از خود لکھیں',
+  /* auto-detect: GPS/permission band ho to poochein */
+  'loc.issue.title': 'لوکیشن دستیاب نہیں',
+  'loc.issue.msg':
+    'ابھی GPS لوکیشن نہیں ملی — لوکیشن (GPS) آن کریں اور ایپ کی اجازت دیں، پھر دوبارہ کوشش کریں۔ آپ شہر کا نام لکھ کر بھی تلاش کر سکتے ہیں۔',
+  'loc.openGps': 'GPS سیٹنگز کھولیں',
+  'loc.openApp': 'ایپ سیٹنگز کھولیں',
   'set.type.gps': 'GPS (از خود ملی)',
   'set.type.ip': 'IP (از خود ملی)',
   'set.type.manual': 'مینول',
@@ -302,7 +311,6 @@ const ur = {
   'err.http': 'درخواست ناکام ({{status}})',
   'err.network': 'انٹرنیٹ کنکشن نہیں',
   'err.geocode': 'جگہ نہیں ملی — شہر کا نام چیک کریں',
-  'err.ipDetect': 'جگہ از خود تلاش نہ ہو سکی',
 
   'weather.unavailable': 'موسم دستیاب نہیں',
   'wmo.0': 'صاف آسمان',
@@ -379,7 +387,6 @@ const hi = {
   'home.weather.hilo': 'अधिकतम {{max}}°  न्यूनतम {{min}}°',
   'home.elevation': 'ऊँचाई {{ft}} फुट',
   'home.source': 'नमाज़ के वक़्त: Aladhan · मौसम: Open-Meteo',
-  'home.approxLocation': 'स्थान अनुमान से लिया गया है — सेटिंग्स में GPS या शहर खुद चुनें।',
 
   'caption.endsIn': '{{name}} का समय समाप्त होने में',
 
@@ -417,6 +424,12 @@ const hi = {
   'set.saveFailed': 'स्थान सहेजा नहीं गया — फिर कोशिश करें',
   'set.detected': 'स्थान मिला: {{label}}',
   'set.detectFailed': 'पता नहीं चल सका — अनुमति दें या खुद लिखें',
+  /* auto-detect: GPS/permission band ho to poochein */
+  'loc.issue.title': 'लोकेशन उपलब्ध नहीं है',
+  'loc.issue.msg':
+    'अभी GPS लोकेशन नहीं मिली — लोकेशन (GPS) चालू करें और ऐप की अनुमति दें, फिर दोबारा कोशिश करें। आप शहर का नाम लिखकर भी खोज सकते हैं।',
+  'loc.openGps': 'GPS सेटिंग्स खोलें',
+  'loc.openApp': 'ऐप सेटिंग्स खोलें',
   'set.type.gps': 'GPS (स्वतः मिला)',
   'set.type.ip': 'IP (स्वतः मिला)',
   'set.type.manual': 'हाथ से',
@@ -441,7 +454,6 @@ const hi = {
   'err.http': 'अनुरोध विफल ({{status}})',
   'err.network': 'इंटरनेट कनेक्शन नहीं',
   'err.geocode': 'जगह नहीं मिली — शहर का नाम जाँचें',
-  'err.ipDetect': 'स्थान का पता नहीं चल सका',
 
   'weather.unavailable': 'मौसम उपलब्ध नहीं',
   'wmo.0': 'साफ़ आसमान',
@@ -493,7 +505,6 @@ const rom = {
   'home.remaining': 'baqi waqt',
   'home.table.section': 'Aaj ki nawazein · Hanafi Asr',
   'home.elevation': 'Bulandi {{ft}} ft',
-  'home.approxLocation': 'Location andaza se li gayi hai — Settings mein GPS ya haath se set karein.',
 
   'caption.endsIn': '{{name}} ka waqt khatam hone mein',
 
@@ -516,6 +527,12 @@ const rom = {
   'set.saveFailed': 'Location save nahi hui — dobara try karein',
   'set.detected': 'Location auto mili: {{label}}',
   'set.detectFailed': 'Location detect nahi hui — permission allow karein ya haath se likhein',
+  /* auto-detect: GPS/permission band ho to poochein */
+  'loc.issue.title': 'Location dastyaab nahi',
+  'loc.issue.msg':
+    'Abhi GPS location nahi mili — Location (GPS) on karein aur app permission dein, phir dobara koshish karein. Aap shehar ka naam likh kar bhi search kar sakte hain.',
+  'loc.openGps': 'GPS settings kholein',
+  'loc.openApp': 'App settings kholein',
   'set.language.title': 'Zaban',
   'set.language.hint': 'Poori app aapki chuni hui zaban mein chalegi.',
 
@@ -534,7 +551,6 @@ const rom = {
   'err.timeout': 'Network slow hai — dobara try karein',
   'err.network': 'Internet nahi mila',
   'err.geocode': 'Location nahi mili — city ka naam check karein',
-  'err.ipDetect': 'Location khud se detect nahi ho saki',
 }
 
 const MESSAGES = { en, ur, hi, rom }
