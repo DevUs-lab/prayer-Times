@@ -119,6 +119,20 @@ function yearFromKey(key) {
 }
 
 /**
+ * Error jis ke saath uska i18n key bhi jaata hai.
+ *
+ * Message to yahin (aaj ki zubaan mein) ban jata hai, lekin screen par wo
+ * `t(error.key, error.params)` se render hota hai — warna zubaan badalne par
+ * purani zubaan ka message state mein pada reh jata.
+ */
+function keyedError(key, params) {
+  const error = new Error(t(key, params))
+  error.key = key
+  error.params = params
+  return error
+}
+
+/**
  * Cache ki jagah mehdood hai, isliye saaf-suthri policy:
  *
  *   • apni jagah  → poora saal (+ agla saal Nov/Dec mein) rakho. Yahi "ek
@@ -137,15 +151,19 @@ async function pruneStaleCaches(currentKey) {
     const monthSlash = currentKey.lastIndexOf('/', lastSlash - 1)
     const locationPrefix = currentKey.slice(0, monthSlash + 1) // '@pt/tt/31.50/74.30/'
     const locationId = locationPrefix.slice(TIMETABLE_PREFIX.length, -1) // '31.50/74.30'
-    const currentMonth = monthIndexFromKey(currentKey)
-    const thisYear = new Date().getFullYear()
+    // Aaj ka mahina — currentKey ka nahi: sync ke dauran currentKey mahina
+    // badal-badalkar (Jan…Dec) chunta rehta hai, warna doosri jagah ka aaj ka
+    // mahina bhi mit sakta.
+    const today = new Date()
+    const todayMonth = today.getFullYear() * 12 + today.getMonth() + 1
+    const thisYear = today.getFullYear()
 
     const stale = keys.filter((key) => {
       if (key.startsWith(TIMETABLE_PREFIX)) {
         if (key === currentKey) return false
         if (yearFromKey(key) < thisYear) return true // guzra hua saal
         if (key.startsWith(locationPrefix)) return false // apni jagah: poora saal
-        return Math.abs(monthIndexFromKey(key) - currentMonth) > 1 // doosri jagah: qareeb ka
+        return Math.abs(monthIndexFromKey(key) - todayMonth) > 1 // doosri jagah: qareeb ka
       }
 
       if (key.startsWith(SYNC_META_PREFIX)) {
@@ -187,7 +205,7 @@ export async function getMonthTimetable({
   force = false,
 }) {
   if (!isValidCoordinate(latitude, 90) || !isValidCoordinate(longitude, 180)) {
-    throw new Error(t('err.invalidLocation'))
+    throw keyedError('err.invalidLocation')
   }
 
   const key = timetableKey(latitude, longitude, date, method, school)
@@ -228,13 +246,13 @@ async function downloadMonth({ latitude, longitude, date, method, school, key })
     // gets the one message the offline screen shows (message in the user's
     // language, logic decided by `code`, never by parsing text).
     if (error && (error.code === 'http' || error.code === 'timeout')) throw error
-    const offlineError = new Error(t('err.offlineFirst'))
+    const offlineError = keyedError('err.offlineFirst')
     offlineError.code = 'network'
     throw offlineError
   }
 
   if (json.code !== 200 || !Array.isArray(json.data)) {
-    throw new Error(t('err.times'))
+    throw keyedError('err.times')
   }
 
   try {
@@ -274,6 +292,7 @@ export async function syncYear({
   method = DEFAULT_METHOD,
   school = ASR_SCHOOL,
   refreshAll = false,
+  onFailure = null, // har fail par bulaye — caller ko `code` janne ki zaroorat
 }) {
   let next = 0
   let synced = 0
@@ -298,7 +317,10 @@ export async function syncYear({
         synced += 1
       } catch (e) {
         failed += 1
-        if (e && e.code === 'network') offline += 1
+        // Network ya timeout — dono ka matlab hai internet kamzor/ghayab hai,
+        // 3 se zyada intezaar bekar hai. (http/server error par saal poora koshish.)
+        if (e && (e.code === 'network' || e.code === 'timeout')) offline += 1
+        if (onFailure) onFailure(e)
       }
     }
   }
@@ -343,6 +365,7 @@ export async function syncIfNeeded({
 
   const summary = { synced: 0, failed: 0 }
   let attempted = 0
+  let netFailures = 0 // network/timeout — "no internet" sirf inko dekh kar
 
   for (const year of years) {
     let meta = null
@@ -363,6 +386,9 @@ export async function syncIfNeeded({
         method,
         school,
         refreshAll: force || Boolean(meta),
+        onFailure: (e) => {
+          if (e && (e.code === 'network' || e.code === 'timeout')) netFailures += 1
+        },
       })
       summary.synced += result.synced
       summary.failed += result.failed
@@ -370,9 +396,16 @@ export async function syncIfNeeded({
   }
 
   if (attempted > 0 && summary.synced === 0) {
-    const offlineError = new Error(t('err.offlineSaved'))
-    offlineError.code = 'network'
-    throw offlineError
+    // Failures sirf server (http) ki wajah se hon to "no internet" bohot jhoot
+    // hai — code 'http' do aur message bhi waqt-on-the-spot wala.
+    if (netFailures > 0) {
+      const offlineError = keyedError('err.offlineSaved')
+      offlineError.code = 'network'
+      throw offlineError
+    }
+    const serverError = keyedError('err.times')
+    serverError.code = 'http'
+    throw serverError
   }
 
   return summary
@@ -429,7 +462,7 @@ export async function getPrayerDay(date, location, method = DEFAULT_METHOD) {
   })
 
   const entry = entryForDay(monthData, date)
-  if (!entry) throw new Error(t('err.noEntry'))
+  if (!entry) throw keyedError('err.noEntry')
 
   const raw = {
     Fajr: rawTime(entry, 'Fajr'),
@@ -769,11 +802,11 @@ export async function getHijriMonthDays(hijriMonth, hijriYear) {
     `https://api.aladhan.com/v1/hToGCalendar/${Number(hijriMonth)}/${Number(hijriYear)}`,
   )
   if (json.code !== 200 || !Array.isArray(json.data)) {
-    throw new Error(t('err.hijriFetch'))
+    throw keyedError('err.hijriFetch')
   }
 
   const days = normalizeHijriDays(json.data)
-  if (days.length === 0) throw new Error(t('err.hijriEmpty'))
+  if (days.length === 0) throw keyedError('err.hijriEmpty')
 
   try {
     await AsyncStorage.setItem(key, JSON.stringify(json.data))
@@ -817,7 +850,7 @@ export async function getHijriForDate(date) {
 
   const json = await getJson(`https://api.aladhan.com/v1/gToH/${toDmy(date)}`)
   const hijri = normalizeHijriDate(json && json.data)
-  if (!hijri) throw new Error(t('err.hijriDate'))
+  if (!hijri) throw keyedError('err.hijriDate')
 
   try {
     await AsyncStorage.setItem(key, JSON.stringify(hijri))

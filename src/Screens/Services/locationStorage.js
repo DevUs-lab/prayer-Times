@@ -7,6 +7,12 @@ export async function saveLocation(location) {
 }
 
 export async function loadLocation() {
-  const value = await AsyncStorage.getItem(KEY)
-  return value ? JSON.parse(value) : null
+  try {
+    const value = await AsyncStorage.getItem(KEY)
+    return value ? JSON.parse(value) : null
+  } catch (e) {
+    // Kharab/purana saved data app ko boot hone se na roke — start hi na ho
+    // jana sab se buri haalat hai. Null = dobara location set karni paregi.
+    return null
+  }
 }

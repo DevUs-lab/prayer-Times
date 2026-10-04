@@ -59,7 +59,7 @@ function hourLabel(iso) {
   const match = /T(\d{2}):(\d{2})/.exec(iso)
   if (!match) return ''
   const hours = Number(match[1])
-  const suffix = hours >= 12 ? 'PM' : 'AM'
+  const suffix = hours >= 12 ? t('time.pm') : t('time.am')
   const hours12 = hours % 12 === 0 ? 12 : hours % 12
   return `${hours12}${suffix}`
 }
@@ -82,7 +82,7 @@ function Stat({ icon, label, value }) {
   )
 }
 
-export default function Frontend({ location, onOpenSettings }) {
+export default function Frontend({ location, onOpenSettings, active = true }) {
   const insets = useSafeAreaInsets()
   // Subscribes the screen to language changes (all strings below read the
   // active language at render time via `t`).
@@ -92,16 +92,24 @@ export default function Frontend({ location, onOpenSettings }) {
   const [weather, setWeather] = useState(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
-  const [error, setError] = useState('')
+  // Error = { key, params } — render par t(key) se banta hai, warna zubaan
+  // badalne par purani zubaan ka message screen par pada reh jata.
+  const [error, setError] = useState(null)
   const [, setTick] = useState(0)
   // Aaj ka din — raat guzar jaye to timetable sirf ek baar refresh ho.
   const loadedDayRef = useRef(new Date().toDateString())
+  // Har load ka apna number: location jaldi badalne par sirf aakhri load
+  // hi state likh sakta hai (warna purani jagah ka jawab nayi par aa jata).
+  const loadIdRef = useRef(0)
 
   // isRefresh = screen par naye data ki koshish (clear nahi karta)
   // pullSync   = user ne khud refresh kiya → poora saal dobara download
   const load = useCallback(
     async (isRefresh, pullSync) => {
       if (!location) return
+      const loadId = (loadIdRef.current += 1)
+      const isLatest = () => loadId === loadIdRef.current
+
       if (isRefresh) {
         setRefreshing(true)
       } else {
@@ -111,11 +119,11 @@ export default function Frontend({ location, onOpenSettings }) {
         setTomorrow(null)
         setWeather(null)
       }
-      setError('')
+      setError(null)
 
       // Pull-to-refresh: poora saal phone mein utaar do (internet ho to).
       // Nahi mila to bhi rukein nahi — cache ka purana data hi sahi.
-      let syncNote = ''
+      let syncNote = null
       if (pullSync) {
         try {
           await syncIfNeeded({
@@ -124,20 +132,28 @@ export default function Frontend({ location, onOpenSettings }) {
             force: true,
           })
         } catch (e) {
-          syncNote = t('err.offlineSaved')
+          syncNote = { key: (e && e.key) || 'err.offlineSaved', params: e && e.params }
         }
       }
 
+      // Weather apni raftaar par — is ka intezaar namaz ke waqt nahi karte.
+      // Kamzor internet par saved waqt foran aa jate hain; mausam aata rahega
+      // ya miss ho jayega (weather section phir bhi "not available" dikhata hai).
+      fetchWeather(location.latitude, location.longitude)
+        .then((weatherData) => {
+          if (isLatest()) setWeather(weatherData)
+        })
+        .catch(() => { })
+
       try {
         const now = new Date()
-        const [todayData, tomorrowData, weatherData] = await Promise.all([
+        const [todayData, tomorrowData] = await Promise.all([
           getPrayerDay(now, location, DEFAULT_METHOD),
           getPrayerDay(addDays(now, 1), location, DEFAULT_METHOD),
-          fetchWeather(location.latitude, location.longitude).catch(() => null),
         ])
+        if (!isLatest()) return // beech mein jagah badal gayi — ye jawab purana hai
         setToday(todayData)
         setTomorrow(tomorrowData)
-        setWeather(weatherData)
         if (syncNote) setError(syncNote)
 
         // App khulna: peeche khamoshi se missing mahine bhar deta hai
@@ -149,10 +165,12 @@ export default function Frontend({ location, onOpenSettings }) {
           )
         }
       } catch (e) {
-        setError(e && e.message ? e.message : t('err.times'))
+        setError({ key: (e && e.key) || 'err.times', params: e && e.params })
       } finally {
-        setLoading(false)
-        setRefreshing(false)
+        if (isLatest()) {
+          setLoading(false)
+          setRefreshing(false)
+        }
       }
     },
     [location],
@@ -164,17 +182,22 @@ export default function Frontend({ location, onOpenSettings }) {
 
   // Ticking re-renders the countdown every second — aur jab din badal jaye to
   // naye din ke waqt khud le aata hai (sirf ek baar, isliye loadedDayRef).
+  // Tab chhupne par tick ruk jata hai (chhupi screen ka har-second ka render
+  // bekar CPU hai); wapas aate hi foran ek tick + din ka check chalta hai.
   useEffect(() => {
-    const id = setInterval(() => {
+    if (!active) return undefined
+    const tick = () => {
       setTick((value) => value + 1)
       const todayStr = new Date().toDateString()
       if (loadedDayRef.current && loadedDayRef.current !== todayStr) {
         loadedDayRef.current = todayStr // baar baar call se bachne ke liye
         load(true)
       }
-    }, 1000)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
     return () => clearInterval(id)
-  }, [load])
+  }, [load, active])
 
   // Times arrive with seconds straight from the day's calculation.
   const todayTimes = today ? today.times : []
@@ -188,20 +211,28 @@ export default function Frontend({ location, onOpenSettings }) {
 
   if (!location) return <LocationPrompt onPress={onOpenSettings} />
   if (loading && !today) return <Loading label={t('home.loading')} />
-  if (error && !today) return <ErrorState message={error} onRetry={() => load(false)} />
+  if (error && !today) {
+    return <ErrorState message={t(error.key, error.params)} onRetry={() => load(false)} />
+  }
 
   const hijri = today?.hijri
   const nextInfo = countdown?.target
   const nowInfo = countdown?.current || null // what is running at this minute
   const rowInfo = nowInfo || nextInfo // the big row: Now — or Next before Fajr
   const weatherInfoBlock = weather ? weatherInfo(weather.current.code, weather.current.isDay) : null
+  // Aksar API payloads mein daily/hourly missing ho sakti hain — guard.
+  const day0 = weather ? (weather.daily || [])[0] : null
   const nextPrayer = countdown?.nextPrayer || null
 
   // Table ki wo row jo is waqt chal rahi hai (sirf asli namazen, Sunrise nahi).
-  // Agar koi namaz na chal rahi ho (misal: sunrise → Zuhr ka gap) to agli
-  // namaz highlight ho jaye.
+  // NOW card seconds tak chalta hai, isliye pehle usi ka current dekhte hain
+  // (warna 4:45:20 par card aur table alag dikh sakte the).
   const clock = nowInTimeZone(today?.timezone)
-  const currentKey = findCurrentPrayerKey(windows, clock) || nextPrayer?.key || null
+  const currentKey =
+    (countdown?.current?.isPrayer ? countdown.current.key : null) ||
+    findCurrentPrayerKey(windows, clock) ||
+    nextPrayer?.key ||
+    null
 
   // "Elevation 1338 ft · GMT +5.0" — altitude + UTC offset for the location.
   const metaBits = []
@@ -252,7 +283,15 @@ export default function Frontend({ location, onOpenSettings }) {
 
         {metaLine ? <Text style={styles.metaLine}>{metaLine}</Text> : null}
 
-        {error ? <Text style={styles.inlineError}>{error}</Text> : null}
+        {error ? (
+          <Text style={styles.inlineError}>{t(error.key, error.params)}</Text>
+        ) : null}
+
+        {/* IP-based location: shehar internet provider wala ho sakta hai —
+            chhota sa aagah kar dein ke waqt andazay ke hain. */}
+        {location.type === 'ip' ? (
+          <Text style={styles.inlineError}>{t('home.approxLocation')}</Text>
+        ) : null}
       </Card>
 
       {/* ---------- Now + Next: a prayer OR a day event (Talu-e-Aftab…) ---------- */}
@@ -320,8 +359,12 @@ export default function Frontend({ location, onOpenSettings }) {
       <Card style={styles.listCard}>
         <View style={styles.tableHead}>
           <Text style={[styles.colName, styles.headText]}>{t('home.table.prayer')}</Text>
-          <Text style={[styles.colTime, styles.headText]}>{t('home.table.starts')}</Text>
-          <Text style={[styles.colTime, styles.headText]}>{t('home.table.ends')}</Text>
+          <Text numberOfLines={1} style={[styles.colTime, styles.headText]}>
+            {t('home.table.starts')}
+          </Text>
+          <Text numberOfLines={1} style={[styles.colTime, styles.headText]}>
+            {t('home.table.ends')}
+          </Text>
         </View>
 
         {windows.map((prayer, index) => {
@@ -355,10 +398,13 @@ export default function Frontend({ location, onOpenSettings }) {
                 </View>
               </View>
 
-              <Text style={[styles.colTime, styles.timeStart, isCurrent && styles.timeNext]}>
+              <Text
+                numberOfLines={1}
+                style={[styles.colTime, styles.timeStart, isCurrent && styles.timeNext]}
+              >
                 {formatTime12(prayer.time)}
               </Text>
-              <Text style={[styles.colTime, styles.timeEnd, isPast && styles.pastText]}>
+              <Text numberOfLines={1} style={[styles.colTime, styles.timeEnd, isPast && styles.pastText]}>
                 {prayer.end ? formatTime12(prayer.end) : '—'}
               </Text>
             </View>
@@ -379,8 +425,11 @@ export default function Frontend({ location, onOpenSettings }) {
                 <Text style={styles.weatherLabel}>{weatherInfoBlock.label}</Text>
                 <Text style={styles.weatherFeels}>
                   {t('home.weather.feels')} {Math.round(weather.current.feelsLike)}°
-                  {weather.daily[0]
-                    ? ` · H ${Math.round(weather.daily[0].max)}°  L ${Math.round(weather.daily[0].min)}°`
+                  {day0
+                    ? ` · ${t('home.weather.hilo', {
+                      max: Math.round(day0.max),
+                      min: Math.round(day0.min),
+                    })}`
                     : ''}
                 </Text>
               </View>
@@ -404,12 +453,12 @@ export default function Frontend({ location, onOpenSettings }) {
               <Stat
                 icon={ICONS.rain}
                 label={t('home.weather.rain')}
-                value={`${weather.current.precipitation ?? 0} mm`}
+                value={t('home.weather.mm', { n: weather.current.precipitation ?? 0 })}
               />
               <Stat
                 icon={ICONS.uv}
-                label="UV"
-                value={weather.daily[0] ? Math.round(weather.daily[0].uvIndex ?? 0) : '—'}
+                label={t('home.weather.uv')}
+                value={day0 ? Math.round(day0.uvIndex ?? 0) : '—'}
               />
             </View>
 
@@ -421,7 +470,7 @@ export default function Frontend({ location, onOpenSettings }) {
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.hourlyStrip}
             >
-              {weather.hourly.slice(0, 8).map((hour) => (
+              {(weather.hourly || []).slice(0, 8).map((hour) => (
                 <View key={hour.time} style={styles.hourCell}>
                   <Text style={styles.hourTime}>{hourLabel(hour.time)}</Text>
                   <Icon
@@ -436,7 +485,7 @@ export default function Frontend({ location, onOpenSettings }) {
           </Card>
 
           <Card style={styles.forecastCard}>
-            {weather.daily.map((day, index) => (
+            {(weather.daily || []).map((day, index) => (
               <View key={day.date} style={[styles.forecastRow, index > 0 && styles.rowBorder]}>
                 <Text style={styles.forecastDay}>
                   {index === 0
@@ -463,7 +512,7 @@ export default function Frontend({ location, onOpenSettings }) {
         </Card>
       )}
 
-      <Text style={styles.source}>Prayer times: Aladhan · Weather: Open-Meteo</Text>
+      <Text style={styles.source}>{t('home.source')}</Text>
       <View style={{ height: spacing.xl }} />
     </ScrollView>
   )
@@ -695,7 +744,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   colTime: {
-    width: 74,
+    // 12 px font par "12:04:22 PM" ≈ 83 px — 74 par do line toot jata tha
+    width: 86,
     textAlign: 'right',
     fontVariant: ['tabular-nums'],
   },

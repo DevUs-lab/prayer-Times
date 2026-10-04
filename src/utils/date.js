@@ -136,7 +136,8 @@ export function formatWeekdayShort(date, locale = 'en-US') {
     try {
       return date.toLocaleDateString('en-US', { weekday: 'short', timeZone: 'UTC' })
     } catch (e2) {
-      return ''
+      // Intl data hi na ho: "Sun Oct 04 2026" -> "Sun"
+      return date.toDateString().split(' ')[0] || ''
     }
   }
 }

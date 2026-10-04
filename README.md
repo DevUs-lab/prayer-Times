@@ -1,17 +1,20 @@
 # Prayer Times 🕌
 
-A React Native app (Android + iOS) for daily prayer times, the Islamic (Hijri) calendar and weather — English UI with Roman-Urdu hints.
+A React Native app (Android + iOS) for daily prayer times, the Islamic (Hijri) calendar and weather — in **English, Urdu, Hindi or Roman Urdu** (your choice on first launch).
 
 ## Features
 
-- **Home** — mosque header with today's Hijri + Gregorian date and the location meta line (**Bulandi 1338 ft · GMT +5.0**), a **NOW / NEXT card**, and the full prayer table showing **both the start (adhan) and end time** of every prayer. Below that: current weather, hourly strip and a 7-day forecast. Pull-to-refresh.
-- **NOW / NEXT card** — one merged timeline of prayers *and* the day's other events, so the section behaves like a Pakistani app: after Fajr it shows **Talu-e-Aftab** next, then **Ishraq**, **Duha-e-Sughra / Duha-e-Kubra**, **Zawal (Makrooh)**, **Dhuhr**… The big countdown runs to the end of whatever is running and says so — e.g. `04:11:23` under **"Zuhr ka waqt khatam hone mein"** — with a `NEXT` line for what takes over, and a progress bar from the current entry to that moment. Before Fajr the card simply reads `NEXT · Fajr`; after midnight the night markers (**Nisf al-Layl**, **Aakhri third**) are what is running — they are calculated from the night length (Aladhan's `Midnight` / `Lastthird` as fallback).
+- **First-run intro: language, then location** — a fresh install opens with **"Choose your language"** (English · اردو · हिन्दी · Roman Urdu), then **"Set your location"** (one-tap auto-detect or a manual city search, with a skip so you are never stuck). Every later open goes straight to Home; both choices stay changeable in **Settings**.
+- **Full app in four languages** — every visible string (tabs, prayer names + glosses, countdown sentence, weather labels, errors, calendar) lives in `src/i18n/strings.js` with English fallback and `{{param}}` interpolation. Roman Urdu keeps the app's legacy copy, e.g. English shows **"Dhuhr ends in"** where Roman Urdu shows **"Zuhr ka waqt khatam hone mein"**. Urdu is rendered right-to-left inside the (still LTR) layout using the system's Naskh/Nastaliq fonts; Hindi uses Devanagari — no bundled font files.
+- **Home** — mosque header with today's Hijri + Gregorian date and the location meta line (**Elevation 1338 ft · GMT +5.0**, "Bulandi …" in Roman Urdu), a **NOW / NEXT card**, and the full prayer table showing **both the start (adhan) and end time** of every prayer. Below that: current weather, hourly strip and a 7-day forecast. Pull-to-refresh.
+- **NOW / NEXT card** — one merged timeline of prayers *and* the day's other events, so the section behaves like a Pakistani app: after Fajr it shows **Talu-e-Aftab** next, then **Ishraq**, **Duha-e-Sughra / Duha-e-Kubra**, **Zawal (Makrooh)**, **Dhuhr**… The big countdown runs to the end of whatever is running and says so — e.g. `04:11:23` under **"Zuhr ka waqt khatam hone mein"** (Roman Urdu; English: "Dhuhr ends in", Urdu: "ظہر کا وقت ختم ہونے میں") — with a `NEXT` line for what takes over, and a progress bar from the current entry to that moment. Before Fajr the card simply reads `NEXT · Fajr`; after midnight the night markers (**Nisf al-Layl**, **Aakhri third**) are what is running — they are calculated from the night length (Aladhan's `Midnight` / `Lastthird` as fallback).
 - **Islamic Calendar** — browse any Hijri month, tap to pick from all 12 Islamic months and a year, see the matching Gregorian dates and highlight today.
-- **Settings** — one search box with **live place suggestions**: type `Jhang` and a list appears (`Jhang — Jhang District, Punjab, Pakistan`, `Jhang — Attock District, …`), tap one and it is saved. Or use the one-tap auto-detect button (GPS first, city-level IP fallback).
-- **Location is auto-detected on first launch** — the app asks for GPS once and, if that is refused, falls back to an IP-based city lookup, so prayer times work without any setup.
+- **Settings** — a **Language** section (the same four choices as the intro, applied instantly), one search box with **live place suggestions**: type `Jhang` and a list appears (`Jhang — Jhang District, Punjab, Pakistan`, `Jhang — Attock District, …`), tap one and it is saved. Or use the one-tap auto-detect button (GPS first, city-level IP fallback).
+- **Location is asked for, not guessed** — the intro's location step runs the device GPS (satellite fix first, Wi-Fi/mobile-tower fix as the indoor fallback, so it still works without internet) and, if that is refused, falls back to an IP-based city lookup; you can also search by name or skip and set it later.
 - **Prayer calculation is fixed** — the **Karachi (University of Islamic Sciences)** method, i.e. Fajr 18° / Isha 18°, which is what mosques and Pakistani prayer apps use, plus **always Hanafi Asr** (`school = 1`: shadow = 2× object). No method picker to get confused by.
 - **The times themselves are calculated in the app, with seconds** — `solarTimes.js` runs the solar maths (declination + equation of time → hour angles), so the table reads `4:45:32` instead of Aladhan's rounded `04:46`, and sunrise/Maghrib use an **elevation-corrected horizon** (`0.833° + 0.0347·√metres`, elevation cached from Open-Meteo): Jhang sits 161 m up, so sunrise is `6:04:22`, not a flat-horizon `6:06`. Aladhan still supplies the Hijri date, the timezone anchor and the fallback minutes — a calculated time is only adopted when it lands within **30 minutes** of the timetable (real horizon/coordinate differences are ±2 min; a broken timezone or coordinate lands hours away).
-- **A whole year on the phone, offline-friendly** — one pull-to-refresh downloads all 12 months for your location. Every later open syncs quietly in the background: missing months are filled, data older than 30 days is re-downloaded, fresh data is left alone. No internet? Nothing is fetched, the saved times stay on screen, and a note says `Internet nahi mila — saved (purana) data dikha rahe hain`.
+- **A whole year on the phone, offline-friendly** — one pull-to-refresh downloads all 12 months for your location. Every later open syncs quietly in the background: missing months are filled, data older than 30 days is re-downloaded, fresh data is left alone. No internet? Nothing is fetched, the saved times stay on screen, and a note says `No internet — showing saved data` (Roman Urdu: `Internet nahi mila — saved (purana) data dikha rahe hain`). Logic decides by error *code*, never by parsing message text, so the note reads correctly in every language.
+- **Tabs never reload** — a tab you have opened once stays mounted (hidden with `display: none`), so Home → Calendar → Home comes straight back with the times, weather and month already on screen: no spinner, internet or not. Only a screen's *first* open loads.
 
 ## Theming & icons
 
@@ -41,13 +44,18 @@ Monthly prayer timetables and Hijri months are cached in `AsyncStorage`, so each
 
 ```
 src/
-  Components/        TabBar, shared UI (Card, buttons, chips), icons, ornaments, theme
+  Components/        TabBar, shared UI (Card, buttons, chips), PlaceSearch (shared
+                     suggestion box), icons, ornaments, theme
   Screens/
-    index.jsx        App shell: loading state + bottom tabs (Home / Calendar / Settings)
+    index.jsx        App shell: language/location gate (first-run intro) + tabs
+                     (Home / Calendar / Settings — kept mounted once opened,
+                     so tab switches never reload a screen)
+    Onboarding/      First-run steps: LanguageStep (4 languages), LocationStep
+                     (auto-detect or manual search, with skip)
     Frontend/
       index.jsx      Home (NOW/NEXT card, meta line, prayer table with start+end, weather)
       Calendar/      Islamic month browser
-      Settings/      Location search (live suggestions), auto-detect
+      Settings/      Language picker, location search (live suggestions), auto-detect
     Services/
       prayerTimes.js Aladhan timetable (Karachi method, Hanafi Asr), Hijri calendar, normalisers,
                      day events (Talu-e-Aftab, Ishraq, Duha, zawal…) + computeNextItem
@@ -59,7 +67,11 @@ src/
       weather.js     Open-Meteo fetch, WMO codes, elevation/GMT helpers
       geocode.js     Place search (Photon → Open-Meteo), reverse geocode, GPS/IP auto-detect, labels
       location.js    GPS permission + coordinates
-      locationStorage.js
+      locationStorage.js / onboarding.js
+  i18n/
+    strings.js       The four dictionaries (en/ur/hi/rom) + translate/t, prayer and
+                     event names, Hijri-month names, RTL/locale helpers
+    index.jsx        LanguageProvider + useLang() (active language, persistence)
   utils/date.js      Time parsing (HH:MM:SS), 12-hour format, countdown, timezone clock, shiftMinutes
 ```
 
@@ -114,7 +126,7 @@ astronomy):
 ## Checks
 
 ```sh
-npm test        # Jest (App render + prayer/time logic)
+npm test        # Jest (app render, prayer/time logic, i18n dictionaries, onboarding flow)
 npm run lint    # ESLint
 npx tsc --noEmit
 ```

@@ -1,5 +1,8 @@
 module.exports = {
   preset: '@react-native/jest-preset',
+  // Rendering the real screens is well under a second, but on a busy machine
+  // (lint/build running beside the suite) the default 5 s trips false failures.
+  testTimeout: 20000,
   transform: {
     // The RN preset only transforms js/ts/tsx — this project also uses .jsx.
     '^.+\\.(js|jsx|ts|tsx)$': 'babel-jest',

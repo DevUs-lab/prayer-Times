@@ -22,6 +22,15 @@ export default function Screens() {
   const [loadError, setLoadError] = useState('')
   const [onboarded, setOnboarded] = useState(false)
   const [tab, setTab] = useState('home')
+  // Ek baar khul chuka tab dobara load na ho — Home/Calendar phone ke saved
+  // saal ke data se foran khul jayein, chahe internet ho ya na ho. (Nahi to
+  // har tab-switch screen ko mount se shuru karta hai aur loading dikhti hai.)
+  const [opened, setOpened] = useState({ home: true, calendar: false, settings: false })
+
+  const openTab = useCallback((next) => {
+    setTab(next)
+    setOpened((previous) => (previous[next] ? previous : { ...previous, [next]: true }))
+  }, [])
 
   const bootstrap = useCallback(async () => {
     setLoading(true)
@@ -67,16 +76,30 @@ export default function Screens() {
   return (
     <View style={styles.container}>
       <View style={styles.screen}>
-        {tab === 'home' ? (
-          <Frontend location={location} onOpenSettings={() => setTab('settings')} />
+        {/* Screens stay mounted (hidden with display:none) once opened, so
+            coming back shows the data already on screen — no spinner. */}
+        {opened.home ? (
+          <View style={[styles.pane, tab !== 'home' && styles.paneHidden]}>
+            <Frontend
+              location={location}
+              onOpenSettings={() => openTab('settings')}
+              active={tab === 'home'}
+            />
+          </View>
         ) : null}
-        {tab === 'calendar' ? <CalendarScreen /> : null}
-        {tab === 'settings' ? (
-          <SettingsScreen location={location} onSaved={handleSettingsSaved} />
+        {opened.calendar ? (
+          <View style={[styles.pane, tab !== 'calendar' && styles.paneHidden]}>
+            <CalendarScreen active={tab === 'calendar'} />
+          </View>
+        ) : null}
+        {opened.settings ? (
+          <View style={[styles.pane, tab !== 'settings' && styles.paneHidden]}>
+            <SettingsScreen location={location} onSaved={handleSettingsSaved} />
+          </View>
         ) : null}
       </View>
 
-      <TabBar active={tab} onChange={setTab} />
+      <TabBar active={tab} onChange={openTab} />
     </View>
   )
 }
@@ -88,5 +111,11 @@ const styles = StyleSheet.create({
   },
   screen: {
     flex: 1,
+  },
+  pane: {
+    flex: 1,
+  },
+  paneHidden: {
+    display: 'none',
   },
 })

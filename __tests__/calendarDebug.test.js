@@ -93,8 +93,69 @@ test('Calendar screen renders the real hToGCalendar payload', async () => {
 
   expect(rendered).toBeTruthy()
   expect(rendered).toContain("Rabi' al-Thani") // month title from HIJRI_MONTHS
+  // 1 tareekh ka month marker — poora naam, 3 harf ka tukda nahi
+  expect(rendered).toContain('Rabīʿ al-thānī')
   expect(rendered).toContain('1448')
   expect(rendered).toContain('Change month')
   expect(rendered).toContain('1 Sept 2026') // Gregorian range of the Hijri month
   expect(rendered).toContain('#D9B45B') // today's cell is highlighted in gold
+})
+
+/** Screen ke Text nodes ke baray strings (header, titles, labels). */
+function textNodes(renderer) {
+  return renderer.root
+    .findAll((node) => typeof node.props.children === 'string')
+    .map((node) => node.props.children)
+}
+
+test('first open with no internet: “—” header, never "Month null" / "null AH"', async () => {
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default
+  await AsyncStorage.clear() // koi saved Hijri date na ho — sab network se
+  global.fetch = jest.fn(() => Promise.reject(new TypeError('Network request failed')))
+
+  const CalendarScreen = require('../src/Screens/Frontend/Calendar/index.jsx').default
+  const { ErrorState } = require('../src/Components/ui')
+
+  let renderer
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<CalendarScreen />)
+    await flush()
+    await flush()
+    await flush()
+  })
+
+  const texts = textNodes(renderer)
+  expect(renderer.root.findAllByType(ErrorState)).toHaveLength(1)
+  expect(texts).toContain('—') // mahina/mahina abhi pata nahi
+  expect(texts.some((text) => text.includes('Month '))).toBe(false) // "Month null" nahi
+  expect(texts.some((text) => text.includes('AH'))).toBe(false) // "null AH" nahi
+
+  await ReactTestRenderer.act(async () => {
+    renderer.unmount()
+  })
+})
+
+test('a hidden Calendar loads nothing; it loads as soon as its tab opens', async () => {
+  const CalendarScreen = require('../src/Screens/Frontend/Calendar/index.jsx').default
+
+  let renderer
+  await ReactTestRenderer.act(async () => {
+    renderer = ReactTestRenderer.create(<CalendarScreen active={false} />)
+    await flush()
+    await flush()
+    await flush()
+  })
+  expect(textNodes(renderer)).toContain('—') // chhupi hui → initToday nahi chala
+
+  await ReactTestRenderer.act(async () => {
+    renderer.update(<CalendarScreen active />)
+    await flush()
+    await flush()
+    await flush()
+  })
+  expect(textNodes(renderer)).toContain("Rabi' al-Thani") // ab khul gaya
+
+  await ReactTestRenderer.act(async () => {
+    renderer.unmount()
+  })
 })

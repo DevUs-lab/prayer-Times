@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Card, ErrorState, Loading, PrimaryButton } from '../../../Components/ui'
@@ -41,7 +41,7 @@ function formatGregorian(iso, locale) {
   }
 }
 
-export default function CalendarScreen() {
+export default function CalendarScreen({ active = true }) {
   const insets = useSafeAreaInsets()
   const { lang } = useLang() // re-render on language change; strings use `t`
   const [hMonth, setHMonth] = useState(null)
@@ -49,40 +49,58 @@ export default function CalendarScreen() {
   const [todayHijri, setTodayHijri] = useState(null)
   const [days, setDays] = useState([])
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
+  // Error = { key, params }: render par t(key) se banta hai, warna zubaan
+  // badalne par purani zubaan ka message screen par pada reh jata.
+  const [error, setError] = useState(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  // Jis din ka "aaj" dikhaya gaya — raat guzar jaye to sirf tab (jab Calendar
+  // dobara active ho) initToday se refresh hota hai.
+  const loadedDayRef = useRef(null)
 
   // Work out which Hijri month we are in right now.
   const initToday = useCallback(async () => {
     setLoading(true)
-    setError('')
+    setError(null)
     try {
       const hijri = await getHijriForDate(new Date())
       setTodayHijri(hijri)
       setHMonth(Number(hijri.month.number))
       setHYear(Number(hijri.year))
     } catch (e) {
-      setError(t('cal.syncError'))
+      setError({ key: (e && e.key) || 'cal.syncError', params: e && e.params })
     } finally {
       setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    initToday()
-  }, [initToday])
+    if (!active) return // chhupi hui Calendar par kaam bekar hai
+    const todayStr = new Date().toDateString()
+    if (loadedDayRef.current !== todayStr) {
+      loadedDayRef.current = todayStr
+      initToday() // pehli khol (ref null) ya naya din
+    }
+  }, [active, initToday])
+
+  // Har mahine ka apna number: jaldi jaldi badalne par sirf aakhri request
+  // hi days/setLoading likh sakta hai (warna purana jawab naya mahina bigaar deta).
+  const loadIdRef = useRef(0)
 
   const loadDays = useCallback(async (month, year) => {
+    const id = (loadIdRef.current += 1)
     setLoading(true)
-    setError('')
+    setError(null)
     try {
       const data = await getHijriMonthDays(month, year)
+      if (id !== loadIdRef.current) return
       setDays(data)
     } catch (e) {
+      if (id !== loadIdRef.current) return
       setDays([])
-      setError(e && e.message ? e.message : t('cal.loadError'))
+      setError({ key: (e && e.key) || 'cal.loadError', params: e && e.params })
     } finally {
-      setLoading(false)
+      // finally hamesha chalta hai — lekin sirf aakhri request loading band kare
+      if (id === loadIdRef.current) setLoading(false)
     }
   }, [])
 
@@ -158,9 +176,18 @@ export default function CalendarScreen() {
               <Icon name={ICONS.chevronLeft} size={26} color={colors.gold} />
             </Pressable>
 
-            <Pressable style={styles.titleWrap} onPress={() => setPickerOpen(true)}>
-              <Text style={styles.monthTitle}>{hijriMonthName(hMonth, lang)}</Text>
-              <Text style={styles.yearTitle}>{hYear} AH</Text>
+            <Pressable
+              style={styles.titleWrap}
+              onPress={() => {
+                // Hijri saal/mahina abhi aaya nahi (offline pehla din) — to
+                // picker khol kar Gregorian saal ko Hijri na banayein.
+                if (hMonth && hYear) setPickerOpen(true)
+              }}
+            >
+              <Text style={styles.monthTitle}>
+                {hMonth ? hijriMonthName(hMonth, lang) : '—'}
+              </Text>
+              <Text style={styles.yearTitle}>{hYear ? `${hYear} AH` : ''}</Text>
               <View style={styles.changeHint}>
                 <Text style={styles.changeHintText}>{t('cal.change')}</Text>
                 <Icon name={ICONS.chevronDown} size={14} color={colors.textFaint} />
@@ -207,7 +234,7 @@ export default function CalendarScreen() {
           <Loading label={t('cal.loading')} />
         ) : error ? (
           <ErrorState
-            message={error}
+            message={t(error.key, error.params)}
             onRetry={() => (hMonth && hYear ? loadDays(hMonth, hYear) : initToday())}
           />
         ) : (
@@ -231,8 +258,10 @@ export default function CalendarScreen() {
                         {pad2(Number(day.gregorian.day))}
                       </Text>
                       {Number(day.hijri.day) === 1 ? (
-                        <Text style={styles.monthMarker} numberOfLines={1}>
-                          {String(hijriMonthDisplay(day.hijri.month, lang)).slice(0, 3)}
+                        // slice(0, 3) code units kaatta hai (Urdu/Hindi harf
+                        // adhoora) — poori naam, ek hi line, ellipsis.
+                        <Text style={styles.monthMarker} numberOfLines={1} ellipsizeMode="tail">
+                          {hijriMonthDisplay(day.hijri.month, lang)}
                         </Text>
                       ) : null}
                     </View>
@@ -258,17 +287,19 @@ export default function CalendarScreen() {
             <Text style={styles.sheetTitle}>{t('cal.select')}</Text>
 
             <View style={styles.yearRow}>
+              {/* Hijri saal hi kam hota hai — Gregorian saal (2026) kabhi
+                  Hijri (1447) na ban jaye, isliye fallback mein kuch nahi. */}
               <Pressable
-                onPress={() => setHYear((year) => (year || new Date().getFullYear()) - 1)}
+                onPress={() => setHYear((year) => (year ? Number(year) - 1 : year))}
                 style={styles.yearButton}
                 accessibilityRole="button"
                 accessibilityLabel={t('cal.prevYear')}
               >
                 <Text style={styles.yearButtonText}>−</Text>
               </Pressable>
-              <Text style={styles.yearValue}>{hYear} AH</Text>
+              <Text style={styles.yearValue}>{hYear ? `${hYear} AH` : ''}</Text>
               <Pressable
-                onPress={() => setHYear((year) => (year || new Date().getFullYear()) + 1)}
+                onPress={() => setHYear((year) => (year ? Number(year) + 1 : year))}
                 style={styles.yearButton}
                 accessibilityRole="button"
                 accessibilityLabel={t('cal.nextYear')}

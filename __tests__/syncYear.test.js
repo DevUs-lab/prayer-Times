@@ -181,3 +181,39 @@ test('cache keeps this city’s whole year but trims other cities and old years'
   expect(keys.some((key) => key.includes('10.00/10.00/2026-10'))).toBe(true) // qareeb ka → raha
   expect(keys.some((key) => key.startsWith('@pt/meta/31.27/72.31/2026'))).toBe(true)
 })
+
+test('a far month download never deletes another city’s today month (sync moves the current key)', async () => {
+  // Sync Jan…Dec chalta hai, isliye currentKey ka mahina bar-bar badalta hai.
+  // "Aaj ka mahina" us key se nahi — aaj ki tareekh se bachna chahiye.
+  await AsyncStorage.setItem('@pt/tt/10.00/10.00/2026-10/1-1', '[]') // aaj (doosri jagah)
+  await AsyncStorage.setItem('@pt/tt/10.00/10.00/2026-02/1-1', '[]') // door ka (mitna chahiye)
+
+  await getMonthTimetable({
+    latitude: HOME.latitude,
+    longitude: HOME.longitude,
+    date: new Date(2026, 0, 15), // currentKey = 2026-01
+    force: true,
+  })
+
+  const keys = await AsyncStorage.getAllKeys()
+  expect(keys.some((key) => key.includes('10.00/10.00/2026-10'))).toBe(true) // aaj ka → zinda
+  expect(keys.some((key) => key.includes('10.00/10.00/2026-02'))).toBe(false) // door ka → mit gaya
+})
+
+test('server failures report an http error, never "No internet"', async () => {
+  global.fetch = jest.fn(() =>
+    Promise.resolve({ ok: false, status: 500, json: () => Promise.resolve({}) }),
+  )
+
+  let caught = null
+  try {
+    await syncIfNeeded({ ...HOME, force: true })
+  } catch (e) {
+    caught = e
+  }
+
+  expect(caught).toBeTruthy()
+  expect(caught.code).toBe('http')
+  expect(caught.key).toBe('err.times')
+  expect(caught.message).not.toMatch(/No internet/)
+})

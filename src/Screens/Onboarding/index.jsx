@@ -4,11 +4,11 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import Icon, { ICONS } from '../../Components/icons'
 import { Card, PrimaryButton } from '../../Components/ui'
-import { PatternBand } from '../../Components/Ornament'
 import { colors, radius, spacing } from '../../Components/theme'
 import PlaceSearch from '../../Components/PlaceSearch'
 import { LANGS, rtlStyle, useLang } from '../../i18n'
 import { detectLocationAutomatically } from '../Services/geocode'
+import { getElevation } from '../Services/elevation'
 import { saveLocation } from '../Services/locationStorage'
 
 /* ------------------------------------------------------------------ */
@@ -82,6 +82,9 @@ export function LocationStep({ onDone, onSkip }) {
     try {
       const next = await detectLocationAutomatically()
       await saveLocation(next)
+      // Unchai save hote hi cache — pehla download offline ho to bhi
+      // sunrise/Maghrib sahi nikle. (await nahi: ye raasta nahi rokta.)
+      getElevation(next.latitude, next.longitude).catch(() => {})
       onDone(next)
     } catch (e) {
       setFailed(true)
@@ -100,6 +103,7 @@ export function LocationStep({ onDone, onSkip }) {
       label: place.label,
     }
     await saveLocation(next) // PlaceSearch keeps the query if this throws
+    getElevation(next.latitude, next.longitude).catch(() => {})
     onDone(next)
   }
 

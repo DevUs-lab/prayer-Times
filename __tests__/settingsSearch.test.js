@@ -125,6 +125,72 @@ test('typing a city shows distinct place suggestions, tapping one saves it', asy
   expect(stored.label).toBe('Jhang, Jhang District, Punjab, Pakistan')
   expect(stored.latitude).toBeCloseTo(31.2728805, 5)
   expect(stored.type).toBe('manual')
+
+  // save hote hi unchai bhi cache ho jati hai (await nahi — par chal zaroor)
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+  expect(
+    global.fetch.mock.calls.some(([url]) => String(url).includes('api.open-meteo.com/v1/forecast')),
+  ).toBe(true)
+})
+
+test('a failed save shows the red X beside the message, never the tick', async () => {
+  jest.useFakeTimers()
+  const renderer = await renderSettings()
+
+  const AsyncStorage = require('@react-native-async-storage/async-storage').default
+  AsyncStorage.setItem = jest.fn(() => Promise.reject(new Error('disk full')))
+
+  const input = renderer.root.findAllByType(TextInput)[0]
+  await act(async () => {
+    input.props.onChangeText('Jhang')
+  })
+  await act(async () => {
+    jest.advanceTimersByTime(400) // debounce
+  })
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  const touchables = renderer.root.findAllByProps({ activeOpacity: 0.7 })
+  expect(touchables.length).toBeGreaterThanOrEqual(2)
+  await act(async () => {
+    await touchables[0].props.onPress() // save fail hoga
+  })
+  await act(async () => {
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  const { ICONS } = require('../src/Components/icons')
+  const { colors } = require('../src/Components/theme')
+
+  const messages = renderer.root.findAll(
+    (node) =>
+      typeof node.props.children === 'string' && node.props.children.includes('Location not saved'),
+  )
+  expect(messages.length).toBeGreaterThanOrEqual(1)
+
+  // message ke saath wala icon — X aur lal, tick nahi
+  const message = messages.find(
+    (node) =>
+      node.parent &&
+      node.parent.children.some((child) => child && child.props && child.props.name),
+  )
+  expect(message).toBeTruthy()
+  const box = message.parent
+  const icon = box.children.find((child) => child && child.props && child.props.name)
+  expect(icon.props.name).toBe(ICONS.close)
+  expect(icon.props.color).toBe(colors.danger)
+  expect(
+    renderer.root.findAll(
+      (node) => node.props && node.props.name === ICONS.check && node.props.color === colors.gold,
+    ),
+  ).toHaveLength(0)
 })
 
 test('short queries never hit the network', async () => {

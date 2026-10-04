@@ -1,3 +1,10 @@
+import groovy.json.JsonSlurper
+
+def packageJson = new JsonSlurper().parse(new File(rootProject.projectDir, "../package.json"))
+def versionParts = packageJson.version.tokenize('.')   // "1.0.1" -> ["1", "0", "1"]
+def computedVersionCode = versionParts[0].toInteger() * 10000 +
+                          versionParts[1].toInteger() * 100 +
+                          versionParts[2].toInteger()
 apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
@@ -82,8 +89,8 @@ android {
         applicationId "com.prayertimes"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
-        versionName "1.0"
+        versionCode computedVersionCode
+        versionName packageJson.version
     }
     signingConfigs {
         debug {
@@ -92,15 +99,32 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        release {
+            // Apni release key (keytool se banayi). Ye 4 values ya to android/gradle.properties
+            // mein ya behtar C:\Users\<naam>\.gradle\gradle.properties mein likhein:
+            //   MYAPP_UPLOAD_STORE_FILE, MYAPP_UPLOAD_KEY_ALIAS,
+            //   MYAPP_UPLOAD_STORE_PASSWORD, MYAPP_UPLOAD_KEY_PASSWORD
+            // Properties na hon to yeh config khali rehti hai aur neeche debug key lagti hai
+            // (local test APK ke liye theek — Play Store ke liye key zaroori hai).
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                storeFile file(MYAPP_UPLOAD_STORE_FILE)
+                storePassword MYAPP_UPLOAD_STORE_PASSWORD
+                keyAlias MYAPP_UPLOAD_KEY_ALIAS
+                keyPassword MYAPP_UPLOAD_KEY_PASSWORD
+            }
+        }
     }
     buildTypes {
         debug {
             signingConfig signingConfigs.debug
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // https://reactnative.dev/docs/signed-apk-android
+            if (project.hasProperty('MYAPP_UPLOAD_STORE_FILE')) {
+                signingConfig signingConfigs.release
+            } else {
+                signingConfig signingConfigs.debug
+            }
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
         }

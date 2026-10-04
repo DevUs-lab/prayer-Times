@@ -3,6 +3,34 @@ import { getJson } from './http'
 
 const PREFIX = '@pt/elevation/'
 
+// Aaj aur kal dono ek saath mangte hain — doosri call ko rok kar ek hi
+// request par bhej do (jaise prayerTimes ka inflightMonths).
+const inflight = new Map()
+
+async function lookupElevation(key, lat, lng) {
+  try {
+    // 4 second: unchai ka jawab chhota hai aur ek dafa save ho jati hai. 15
+    // second ka default timeout yahan kamzor internet par Home ko latakta
+    // chhod deta — fail ho to 0 (standard horizon) istemal ho jata hai.
+    const json = await getJson(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
+        '&current=temperature_2m&timezone=auto',
+      4000,
+    )
+    const value = Number(json.elevation)
+    if (!Number.isFinite(value)) return 0
+
+    try {
+      await AsyncStorage.setItem(key, String(value))
+    } catch (e) {
+      // caching is best-effort
+    }
+    return value
+  } catch (e) {
+    return 0
+  }
+}
+
 /**
  * Metres above sea level for a coordinate (Open-Meteo), cached permanently —
  * terrain does not move, so this is one network call per location ever.
@@ -31,21 +59,14 @@ export async function getElevation(latitude, longitude) {
     // unreadable cache — fall through to a fresh lookup
   }
 
-  try {
-    const json = await getJson(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lng}` +
-        '&current=temperature_2m&timezone=auto',
-    )
-    const value = Number(json.elevation)
-    if (!Number.isFinite(value)) return 0
+  const pending = inflight.get(key)
+  if (pending) return pending // aaj + kal → ek hi request
 
-    try {
-      await AsyncStorage.setItem(key, String(value))
-    } catch (e) {
-      // caching is best-effort
-    }
-    return value
-  } catch (e) {
-    return 0
+  const request = lookupElevation(key, lat, lng)
+  inflight.set(key, request)
+  try {
+    return await request
+  } finally {
+    inflight.delete(key)
   }
 }

@@ -8,6 +8,7 @@ import { colors, radius, spacing } from '../../../Components/theme'
 import PlaceSearch from '../../../Components/PlaceSearch'
 import { LANGS, rtlStyle, t, useLang } from '../../../i18n'
 import { detectLocationAutomatically, locationLabel } from '../../Services/geocode'
+import { getElevation } from '../../Services/elevation'
 import { saveLocation } from '../../Services/locationStorage'
 
 const LOCATION_TYPES = ['gps', 'ip', 'manual']
@@ -20,7 +21,18 @@ export default function SettingsScreen({ location, onSaved }) {
   const insets = useSafeAreaInsets()
   const { lang, setLang } = useLang()
   const [message, setMessage] = useState('')
+  // Message ab i18n KEY hai (render par t(key) se banta hai) — warna zubaan
+  // badalne par purani zubaan ka message screen par pada reh jata.
+  const [messageParams, setMessageParams] = useState(null)
+  // Error par tick nahi dikhta — X (lal). Ye flag sirf messageBox ka hai.
+  const [messageIsError, setMessageIsError] = useState(false)
   const [busy, setBusy] = useState(null)
+
+  const show = (key, isError = false, params) => {
+    setMessage(key)
+    setMessageParams(params || null)
+    setMessageIsError(isError)
+  }
 
   // Saves the picked place. A failure rethrows so PlaceSearch keeps the
   // typed query (the message below explains why nothing was saved).
@@ -36,10 +48,13 @@ export default function SettingsScreen({ location, onSaved }) {
         label: place.label,
       }
       await saveLocation(next)
+      // Unchai save hi ho gayi — pehli dafa offline sunrise/Maghrib sahi
+      // rahein. Intezar nahi karte (await nahi), apni raftaar par.
+      getElevation(next.latitude, next.longitude).catch(() => {})
       onSaved(next)
-      setMessage(t('set.saved'))
+      show('set.saved')
     } catch (e) {
-      setMessage(t('set.saveFailed'))
+      show('set.saveFailed', true)
       throw e
     } finally {
       setBusy(null)
@@ -48,14 +63,20 @@ export default function SettingsScreen({ location, onSaved }) {
 
   const autoDetect = async () => {
     setBusy('auto')
-    setMessage('')
+    show('')
     try {
       const next = await detectLocationAutomatically()
       await saveLocation(next)
+      getElevation(next.latitude, next.longitude).catch(() => {})
       onSaved(next)
-      setMessage(t('set.detected', { label: locationLabel(next) }))
+      if (next.type === 'ip') {
+        // IP se mila — shehar internet provider wala ho sakta hai (100+ km)
+        show('home.approxLocation', true)
+      } else {
+        show('set.detected', false, { label: locationLabel(next) })
+      }
     } catch (e) {
-      setMessage(t('set.detectFailed'))
+      show('set.detectFailed', true)
     } finally {
       setBusy(null)
     }
@@ -142,8 +163,13 @@ export default function SettingsScreen({ location, onSaved }) {
 
       {message ? (
         <View style={styles.messageBox}>
-          <Icon name={ICONS.check} size={16} color={colors.gold} />
-          <Text style={styles.message}>{message}</Text>
+          <Icon
+            name={messageIsError ? ICONS.close : ICONS.check}
+            size={16}
+            color={messageIsError ? colors.danger : colors.gold}
+          />
+          {/* message = i18n key → zubaan badalne par dobara banta hai */}
+          <Text style={styles.message}>{t(message, messageParams)}</Text>
         </View>
       ) : null}
     </ScrollView>

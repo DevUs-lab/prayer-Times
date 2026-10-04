@@ -21,7 +21,7 @@ export const ICONS = {
   refresh: 'refresh',
   place: 'map-marker',
   search: 'magnify',
-  crosshair: 'crosshair-gps',
+  crosshair: 'crosshairs-gps', // MDI mein "crosshair-gps" NAZM-e-ghalat hai → "?"
   chevronLeft: 'chevron-left',
   chevronRight: 'chevron-right',
   chevronDown: 'chevron-down',
