@@ -1,8 +1,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 
-import { Pressable, RefreshControl, ScrollView, StyleSheet, Text, View } from 'react-native'
+import {
+  LayoutAnimation, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View,
+} from 'react-native'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { Card, ErrorState, Loading, LocationPrompt, SectionTitle } from '../../Components/ui'
+import AllTimesPanel from '../../Components/AllTimes'
 import { Ornament, PatternBand } from '../../Components/Ornament'
 import Icon, { ICONS } from '../../Components/icons'
 import { colors, radius, shadow, spacing } from '../../Components/theme'
@@ -96,6 +99,15 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
   // badalne par purani zubaan ka message screen par pada reh jata.
   const [error, setError] = useState(null)
   const [, setTick] = useState(0)
+  // "All times" — table ki poori sorted view: paanch namazein + sunrise, dono
+  // school, din ke events (Ishraq, Afzal waqt…) aur guraiz ke khitte sab ek jagah.
+  const [showAllTimes, setShowAllTimes] = useState(false)
+  // Expand/collapse: LayoutAnimation (Fabric) table + weather ki height
+  // smooth animate karta hai — koi modal, koi jump nahi.
+  const toggleAllTimes = useCallback(() => {
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut)
+    setShowAllTimes((value) => !value)
+  }, [])
   // Aaj ka din — raat guzar jaye to timetable sirf ek baar refresh ho.
   const loadedDayRef = useRef(new Date().toDateString())
   // Har load ka apna number: location jaldi badalne par sirf aakhri load
@@ -219,6 +231,12 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
   const nextInfo = countdown?.target
   const nowInfo = countdown?.current || null // what is running at this minute
   const rowInfo = nowInfo || nextInfo // the big row: Now — or Next before Fajr
+  // NOW row ka naam: lamba naam (event / poora prayer) ho to font apne aap
+  // chhota taki card se bahar na nikle. Rah gaya to adjustsFontSizeToFit +
+  // minimumFontScale (JSX mein) aakhri hathiyar hain.
+  const nowTitle = rowInfo ? displayName(rowInfo, lang) : ''
+  const nowTitleSize =
+    nowTitle.length > 26 ? 18 : nowTitle.length > 19 ? 20 : nowTitle.length > 12 ? 23 : 26
   const weatherInfoBlock = weather ? weatherInfo(weather.current.code, weather.current.isDay) : null
   // Aksar API payloads mein daily/hourly missing ho sakti hain — guard.
   const day0 = weather ? (weather.daily || [])[0] : null
@@ -300,10 +318,17 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
           </View>
 
           <View style={styles.nowRow}>
-            <Icon name={rowInfo.icon} size={44} color={colors.gold} />
+            <Icon name={rowInfo.icon} size={36} color={colors.gold} />
             <View style={styles.nowInfo}>
-              <Text style={styles.nowName}>{displayName(rowInfo, lang)}</Text>
-              <Text style={styles.nowTime}>
+              <Text
+                style={[styles.nowName, { fontSize: nowTitleSize, lineHeight: nowTitleSize + 8 }]}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.6}
+              >
+                {nowTitle}
+              </Text>
+              <Text style={styles.nowTime} numberOfLines={1}>
                 {formatTime12(rowInfo.time)} ·  {displaySub(rowInfo, lang)}
               </Text>
             </View>
@@ -349,10 +374,19 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
       ) : null}
 
       {/* ---------- Prayer table ---------- */}
-      <SectionTitle>{t('home.table.section')}</SectionTitle>
+      <SectionTitle
+        action={showAllTimes ? t('home.table.five') : t('home.table.all')}
+        onAction={toggleAllTimes}
+        actionOpen={showAllTimes}
+      >
+        {t('home.table.section')}
+      </SectionTitle>
       <Card style={styles.listCard}>
         <View style={styles.tableHead}>
-          <Text style={[styles.colName, styles.headText]}>{t('home.table.prayer')}</Text>
+          <Text style={[styles.colName, styles.headText]}>
+            {t('home.table.prayer')}
+
+          </Text>
           <Text numberOfLines={1} style={[styles.colTime, styles.headText]}>
             {t('home.table.starts')}
           </Text>
@@ -361,7 +395,17 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
           </Text>
         </View>
 
-        {windows.map((prayer, index) => {
+        {/* "All times" → poora din sorted rows (table ke hi style mein),
+            warna paanch namazein + sunrise wali asli table. */}
+        {showAllTimes ? (
+          <AllTimesPanel
+            windows={windows}
+            events={dayEvents}
+            extras={today ? today.extras : {}}
+            currentKey={currentKey}
+            now={countdown ? countdown.now : null}
+          />
+        ) : windows.map((prayer, index) => {
           const isCurrent = currentKey === prayer.key
           const isPast =
             !isCurrent && countdown && prayer.isPrayer && prayer.time
@@ -409,106 +453,108 @@ export default function Frontend({ location, onOpenSettings, active = true }) {
       {/* ---------- Weather ---------- */}
       <SectionTitle>{t('home.weather.title')}</SectionTitle>
 
-      {weather ? (
-        <>
-          <Card>
-            <View style={styles.weatherHead}>
-              <Icon name={weatherInfoBlock.icon} size={58} color={colors.gold} />
-              <View style={styles.weatherTempBlock}>
-                <Text style={styles.weatherTemp}>{Math.round(weather.current.temperature)}°C</Text>
-                <Text style={styles.weatherLabel}>{weatherInfoBlock.label}</Text>
-                <Text style={styles.weatherFeels}>
-                  {t('home.weather.feels')} {Math.round(weather.current.feelsLike)}°
-                  {day0
-                    ? ` · ${t('home.weather.hilo', {
-                      max: Math.round(day0.max),
-                      min: Math.round(day0.min),
-                    })}`
-                    : ''}
-                </Text>
+      {
+        weather ? (
+          <>
+            <Card>
+              <View style={styles.weatherHead}>
+                <Icon name={weatherInfoBlock.icon} size={58} color={colors.gold} />
+                <View style={styles.weatherTempBlock}>
+                  <Text style={styles.weatherTemp}>{Math.round(weather.current.temperature)}°C</Text>
+                  <Text style={styles.weatherLabel}>{weatherInfoBlock.label}</Text>
+                  <Text style={styles.weatherFeels}>
+                    {t('home.weather.feels')} {Math.round(weather.current.feelsLike)}°
+                    {day0
+                      ? ` · ${t('home.weather.hilo', {
+                        max: Math.round(day0.max),
+                        min: Math.round(day0.min),
+                      })}`
+                      : ''}
+                  </Text>
+                </View>
               </View>
-            </View>
 
-            <Ornament />
+              <Ornament />
 
-            <View style={styles.statsRow}>
-              <Stat
-                icon={ICONS.humidity}
-                label={t('home.weather.humidity')}
-                value={`${weather.current.humidity}%`}
-              />
-              <Stat
-                icon={ICONS.wind}
-                label={t('home.weather.wind')}
-                value={`${Math.round(weather.current.windSpeed)} ${windDirectionLabel(
-                  weather.current.windDirection,
-                )}`}
-              />
-              <Stat
-                icon={ICONS.rain}
-                label={t('home.weather.rain')}
-                value={t('home.weather.mm', { n: weather.current.precipitation ?? 0 })}
-              />
-              <Stat
-                icon={ICONS.uv}
-                label={t('home.weather.uv')}
-                value={day0 ? Math.round(day0.uvIndex ?? 0) : '—'}
-              />
-            </View>
+              <View style={styles.statsRow}>
+                <Stat
+                  icon={ICONS.humidity}
+                  label={t('home.weather.humidity')}
+                  value={`${weather.current.humidity}%`}
+                />
+                <Stat
+                  icon={ICONS.wind}
+                  label={t('home.weather.wind')}
+                  value={`${Math.round(weather.current.windSpeed)} ${windDirectionLabel(
+                    weather.current.windDirection,
+                  )}`}
+                />
+                <Stat
+                  icon={ICONS.rain}
+                  label={t('home.weather.rain')}
+                  value={t('home.weather.mm', { n: weather.current.precipitation ?? 0 })}
+                />
+                <Stat
+                  icon={ICONS.uv}
+                  label={t('home.weather.uv')}
+                  value={day0 ? Math.round(day0.uvIndex ?? 0) : '—'}
+                />
+              </View>
 
-            <Ornament />
+              <Ornament />
 
-            <Text style={styles.subHead}>{t('home.weather.next8')}</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.hourlyStrip}
-            >
-              {(weather.hourly || []).slice(0, 8).map((hour) => (
-                <View key={hour.time} style={styles.hourCell}>
-                  <Text style={styles.hourTime}>{hourLabel(hour.time)}</Text>
+              <Text style={styles.subHead}>{t('home.weather.next8')}</Text>
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.hourlyStrip}
+              >
+                {(weather.hourly || []).slice(0, 8).map((hour) => (
+                  <View key={hour.time} style={styles.hourCell}>
+                    <Text style={styles.hourTime}>{hourLabel(hour.time)}</Text>
+                    <Icon
+                      name={weatherInfo(hour.code, true).icon}
+                      size={22}
+                      color={colors.goldBright}
+                    />
+                    <Text style={styles.hourTemp}>{Math.round(hour.temperature)}°</Text>
+                  </View>
+                ))}
+              </ScrollView>
+            </Card>
+
+            <Card style={styles.forecastCard}>
+              {(weather.daily || []).map((day, index) => (
+                <View key={day.date} style={[styles.forecastRow, index > 0 && styles.rowBorder]}>
+                  <Text style={styles.forecastDay}>
+                    {index === 0
+                      ? t('home.weather.today')
+                      : weekdayShort(day.date, intlLocale(lang))}
+                  </Text>
                   <Icon
-                    name={weatherInfo(hour.code, true).icon}
-                    size={22}
+                    name={weatherInfo(day.code, true).icon}
+                    size={20}
                     color={colors.goldBright}
                   />
-                  <Text style={styles.hourTemp}>{Math.round(hour.temperature)}°</Text>
+                  <Text style={styles.forecastRain}>{day.precipitationProbability ?? 0}%</Text>
+                  <View style={styles.forecastTemps}>
+                    <Text style={styles.forecastMax}>{Math.round(day.max)}°</Text>
+                    <Text style={styles.forecastMin}>{Math.round(day.min)}°</Text>
+                  </View>
                 </View>
               ))}
-            </ScrollView>
+            </Card>
+          </>
+        ) : (
+          <Card>
+            <Text style={styles.weatherUnavailable}>{t('home.weather.none')}</Text>
           </Card>
-
-          <Card style={styles.forecastCard}>
-            {(weather.daily || []).map((day, index) => (
-              <View key={day.date} style={[styles.forecastRow, index > 0 && styles.rowBorder]}>
-                <Text style={styles.forecastDay}>
-                  {index === 0
-                    ? t('home.weather.today')
-                    : weekdayShort(day.date, intlLocale(lang))}
-                </Text>
-                <Icon
-                  name={weatherInfo(day.code, true).icon}
-                  size={20}
-                  color={colors.goldBright}
-                />
-                <Text style={styles.forecastRain}>{day.precipitationProbability ?? 0}%</Text>
-                <View style={styles.forecastTemps}>
-                  <Text style={styles.forecastMax}>{Math.round(day.max)}°</Text>
-                  <Text style={styles.forecastMin}>{Math.round(day.min)}°</Text>
-                </View>
-              </View>
-            ))}
-          </Card>
-        </>
-      ) : (
-        <Card>
-          <Text style={styles.weatherUnavailable}>{t('home.weather.none')}</Text>
-        </Card>
-      )}
+        )
+      }
 
       {/* <Text style={styles.source}>{t('home.source')}</Text> */}
       {/* <View style={{ height: spacing.xl }} /> */}
-    </ScrollView>
+    </ScrollView >
   )
 }
 
@@ -612,19 +658,21 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '800',
   },
+
   nowRow: {
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: spacing.m,
-    gap: spacing.m,
+    gap: spacing.s,           // pehle spacing.m tha: naam ko zyada jagah
   },
   nowInfo: {
     flex: 1,
+    minWidth: 0,              // naam ko chhota hone deta hai
   },
   nowName: {
     color: colors.text,
-    fontSize: 26,
     fontWeight: '800',
+    textAlign: 'left',
   },
   nowTime: {
     color: colors.goldBright,
@@ -656,10 +704,11 @@ const styles = StyleSheet.create({
   },
   countdownWrap: {
     alignItems: 'flex-end',
+    flexShrink: 0,
   },
   countdown: {
     color: colors.gold,
-    fontSize: 24,
+    fontSize: 20,             // pehle 24 tha
     fontWeight: '800',
     fontVariant: ['tabular-nums'],
   },

@@ -434,7 +434,7 @@ function rawTime(entry, prayerKey) {
 async function localTimes(date, location, referenceDhuhr) {
   try {
     const elevation = await getElevation(location?.latitude, location?.longitude)
-    return computePrayerTimes({
+    const base = {
       year: date.getFullYear(),
       month: date.getMonth() + 1,
       day: date.getDate(),
@@ -442,7 +442,21 @@ async function localTimes(date, location, referenceDhuhr) {
       longitude: Number(location?.longitude),
       elevation,
       referenceDhuhr,
-    })
+    }
+    const hanafi = computePrayerTimes(base)
+    if (!hanafi) return null
+
+    // Shafi'i school — the same sun, two other questions:
+    //   Asr  = shadow1× object (instead of the Hanafi2×)
+    //   Isha = sun at12° (the earlier of the two, Dawat-e-Islami tables style)
+    const shafiAsr = computePrayerTimes({ ...base, asrFactor: 1 })
+    const shafiIsha = computePrayerTimes({ ...base, ishaAngle: 12 })
+
+    return {
+      ...hanafi,
+      AsrShafi: shafiAsr ? shafiAsr.Asr : null,
+      IshaShafi: shafiIsha ? shafiIsha.Isha : null,
+    }
   } catch (e) {
     return null // keep Aladhan's minutes
   }
@@ -482,16 +496,27 @@ export async function getPrayerDay(date, location, method = DEFAULT_METHOD) {
     return ours && withinMinutes(ours, raw[key]) ? ours : raw[key]
   }
 
+  // Shafi'i waqt ko tabhi dikhao jab apna hisaab timetable ke saath match
+  // kar raha ho (yahi dono checks asli Asr/Isha par bhi lagte hain) — warna
+  // waqt kam-zyada hone ke bajaye bilkul na dikhana behtar hai.
+  const localTrusted =
+    calculated != null &&
+    withinMinutes(calculated.Asr, raw.Asr) &&
+    withinMinutes(calculated.Isha, raw.Isha)
+
   return {
     entry,
     hijri: entry.date.hijri,
     gregorian: entry.date.gregorian,
     timezone: entry.meta?.timezone,
     times: PRAYER_LIST.map((prayer) => ({ ...prayer, time: timeFor(prayer.key) })),
-    // Non-prayer markers (the night after this date) — Nisf al-Layl, aakhri third.
+    // Non-prayer markers (the night after this date) — Nisf al-Layl, aakhri third,
+    // aur Shafi'i school ke asli waqt (Dawat-e-Islami jaisi table mein dono).
     extras: {
       midnight: timeFor('Midnight'),
       lastthird: timeFor('Lastthird'),
+      asrShafi: localTrusted ? calculated.AsrShafi : null,
+      ishaShafi: localTrusted ? calculated.IshaShafi : null,
     },
   }
 }
@@ -550,7 +575,7 @@ function minutesBetween(from, to) {
  * apps put in their "next" section:
  *
  *   Talu-e-Aftab (sunrise) · Ishraq · Duha-e-Sughra · Duha-e-Kubra ·
- *   Zawal (Makrooh) · Nisf al-Layl (midnight) · Aakhri third
+ *   Zawal (Makrooh) · Nisf al-Layl (midnight) · Afzal time of night (last third)
  *
  * Conventions (kept in one place so they are easy to tune):
  *   Ishraq           = sunrise + 20 min
@@ -646,7 +671,7 @@ export function buildDayEvents(day) {
   if (extras.lastthird) {
     events.push({
       key: 'lastthird',
-      label: 'Aakhri third',
+      label: 'Afzal time of night',
       urdu: 'تیسرا حصہ',
       hint: 'Baqi raat ka behtareen waqt',
       time: extras.lastthird,
@@ -657,6 +682,130 @@ export function buildDayEvents(day) {
 
   events.sort((a, b) => minutesFromMidnight(a.time) - minutesFromMidnight(b.time))
   return events
+}
+
+/**
+ * "All times" — poora din EK hi sorted row-list: table ki namazein (dono
+ * school ke saath), din ke events (Ishraq, Duha-e-Kubra, Nisf al-Layl,
+ * Afzal waqt) aur guraiz ke khitte — sab waqt ke order mein.
+ *
+ * Conventions (buildDayEvents / buildTimeline ke saath sync):
+ *   • din Fajr se khulta hai — isliye raat ka aakhri waqt (02:00) list ke
+ *     AAKHIR mein aata hai: Isha → Nisf al-Layl (23:59) → Afzal waqt (02:00)
+ *   • talu duplicate hai (table ki Sunrise row), zawal guraiz ki row ban
+ *     chuka hai, duhaSughra Ishraq se merge (uska start Ishraq hi hai)
+ *   • Ishraq ka end = Duha-e-Sughra ka end, jaise buildTimeline karta hai
+ *   • trust fail? extras.asrShafi/ishaShafi null → school row banti hi nahi
+ *
+ * Entry: `{ id, kind: 'prayer'|'school'|'event'|'makruh', time, end, item,
+ * subKey (sirf makruh), prayerKey, isPrayer, schoolPair, epoch, priority }`
+ */
+export function buildAllTimesList({ windows = [], events = [], extras = {} }) {
+  const rowFor = (key) => windows.find((row) => row.key === key) || null
+  const fajr = rowFor('Fajr')
+  if (!fajr || !fajr.time) return []
+
+  const fajrAt = hmsSeconds(fajr.time)
+  if (fajrAt == null) return []
+  // Fajr = 0 — midnight ke baad wale waqt (02:00) ko wrap karke aakhir le aata hai.
+  const epochOf = (time) => {
+    const at = hmsSeconds(time)
+    return at == null ? null : (at - fajrAt + 86400) % 86400
+  }
+
+  const PRIORITY = { prayer: 0, school: 1, event: 2, makruh: 3 }
+  const entries = []
+  const add = (kind, time, end, extra = {}) => {
+    const epoch = epochOf(time)
+    if (epoch == null) return
+    entries.push({ kind, priority: PRIORITY[kind], epoch, time, end: end || null, ...extra })
+  }
+
+  // 1. table ki rows — paanch namazein + sunrise (ends = agli row tak)
+  for (const row of windows) {
+    add('prayer', row.time, row.end, {
+      item: row,
+      prayerKey: row.key,
+      isPrayer: row.isPrayer,
+      // Asr/Isha ki sub par school ka naam — Shafi row alag se aati hai
+      schoolPair: row.key === 'Asr' || row.key === 'Isha',
+    })
+  }
+
+  // 2. dono school — sirf trusted waqt (galat ho to row hi na bane)
+  const asr = rowFor('Asr')
+  const isha = rowFor('Isha')
+  if (asr && asr.time && extras.asrShafi) {
+    add('school', extras.asrShafi, asr.end, { item: asr, prayerKey: 'Asr', isPrayer: true })
+  }
+  if (isha && isha.time && extras.ishaShafi) {
+    add('school', extras.ishaShafi, isha.end, { item: isha, prayerKey: 'Isha', isPrayer: true })
+  }
+
+  // 3. din ke events — talu/zawal duplicate nahi, duhaSughra Ishraq mein merge
+  const skip = new Set(['talu', 'zawal', 'duhaSughra'])
+  for (const event of events) {
+    if (skip.has(event.key)) continue
+    // sub = chhoti i18n gloss (hint lambi roman-urdu line hai — row par na)
+    add('event', event.time, event.end, { item: event, subKey: `all.times.${event.key}` })
+  }
+  const ishraq = entries.find((entry) => entry.kind === 'event' && entry.item.key === 'ishraq')
+  const duha = events.find((event) => event.key === 'duhaSughra')
+  if (ishraq && duha && duha.end) ishraq.end = duha.end // Ishraq chalta hai Duha-e-Sughra tak
+
+  // 4. guraiz ke khitte — (priority 3) apni waqt-jagah par lag jaate hain
+  const sunrise = rowFor('Sunrise')
+  const dhuhr = rowFor('Dhuhr')
+  const maghrib = rowFor('Maghrib')
+  if (sunrise && sunrise.time) {
+    add('makruh', fajr.time, sunrise.time, { id: 'makruh-dawn', subKey: 'all.makruh.dawn' })
+    add('makruh', sunrise.time, shiftMinutes(sunrise.time, 20), {
+      id: 'makruh-sunrise',
+      subKey: 'all.makruh.sunrise',
+    })
+  }
+  if (dhuhr && dhuhr.time) {
+    add('makruh', shiftMinutes(dhuhr.time, -10), dhuhr.time, {
+      id: 'makruh-zawal',
+      subKey: 'all.makruh.zawal',
+    })
+  }
+  if (asr && asr.time && maghrib && maghrib.time) {
+    add('makruh', asr.time, maghrib.time, { id: 'makruh-asr', subKey: 'all.makruh.asr' })
+  }
+
+  entries.sort((a, b) => a.epoch - b.epoch || a.priority - b.priority)
+  entries.forEach((entry, index) => {
+    if (!entry.id) entry.id = `${entry.kind}-${entry.item ? entry.item.key : index}`
+  })
+  return entries
+}
+
+/** 'HH:MM:SS' → seconds (0 se 86399). Galat/empty value par null. */
+function hmsSeconds(value) {
+  if (!value) return null
+  const parts = String(value).split(':').map(Number)
+  if (parts.length < 2 || parts.some((part) => Number.isNaN(part))) return null
+  return (parts[0] || 0) * 3600 + (parts[1] || 0) * 60 + (parts[2] || 0)
+}
+
+/**
+ * Past dimming ke liye "aaj ka position": Fajr = 0 — bilkul usi scale par
+ * jis par buildAllTimesList row.epoch deta hai.
+ *
+ * [00:00, Fajr) mein aaj ka din shuru nahi hua → null: poora din aane wala
+ * hai, kuch row past nahi (table bhi subah 4 bajey kuch dim nahi dikhata).
+ * Isi wajah se raat ke wrap rows (Nisf 23:59, Afzal 02:00) sahi pakdi jaati
+ * hain — 15:00 par Afzal (aaj raat 02:00) future hi rehta hai.
+ */
+export function dayEpochNow({ windows = [], now = null }) {
+  if (!now || typeof now.getHours !== 'function') return null
+  const fajr = windows.find((row) => row.key === 'Fajr')
+  const fajrAt = hmsSeconds(fajr && fajr.time)
+  if (fajrAt == null) return null
+  const nowSec = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds()
+  if (nowSec < fajrAt) return null
+  return nowSec - fajrAt
 }
 
 /**

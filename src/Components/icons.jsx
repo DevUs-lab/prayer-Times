@@ -25,6 +25,7 @@ export const ICONS = {
   chevronLeft: 'chevron-left',
   chevronRight: 'chevron-right',
   chevronDown: 'chevron-down',
+  chevronUp: 'chevron-up',
   close: 'close',
   check: 'check-circle-outline',
   info: 'information-outline',

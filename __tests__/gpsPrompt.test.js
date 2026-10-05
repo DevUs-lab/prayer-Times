@@ -12,7 +12,8 @@ import { detectLocationAutomatically } from '../src/Screens/Services/geocode'
 import { getUserLocation } from '../src/Screens/Services/location'
 
 // getUserLocation mock hota hai (native GPS chalna nahi chahiye), lekin
-// openLocationSettings asli rahe — wahi Linking.sendIntent call karta hai.
+// openLocationSettings asli rahe — wahi Linking.sendIntent/openSettings
+// call karta hai.
 jest.mock('../src/Screens/Services/location', () => ({
   ...jest.requireActual('../src/Screens/Services/location'),
   getUserLocation: jest.fn(),
@@ -43,9 +44,11 @@ const reversePayload = {
 // Linking/AppState ko wapas nahi la pata — calls jamte reh jate the).
 // Har test shuru mein mockClear() se ginti zero.
 let sendIntentSpy
+let openSettingsSpy
 
 beforeAll(() => {
   sendIntentSpy = jest.spyOn(Linking, 'sendIntent').mockResolvedValue(undefined)
+  openSettingsSpy = jest.spyOn(Linking, 'openSettings').mockResolvedValue(undefined)
   jest.spyOn(AppState, 'addEventListener').mockImplementation((type, handler) => {
     if (type === 'change') appStateListener = handler
     return { remove: jest.fn() }
@@ -58,6 +61,7 @@ beforeEach(() => {
   mockFetch(reversePayload)
   appStateListener = null
   sendIntentSpy.mockClear()
+  openSettingsSpy.mockClear()
 })
 
 afterEach(() => {
@@ -212,7 +216,20 @@ test('permission issue par "Open app settings" app ka page kholti hai', () => {
 
   pressText(root, 'Open app settings')
 
-  expect(Linking.sendIntent).toHaveBeenCalledWith('android.settings.APPLICATION_DETAILS_SETTINGS')
+  // APPLICATION_DETAILS_SETTINGS intent ko package chahiye (wo nahi dene par
+  // ya kuch nahi khulta ya sirf apps ki list) — isliye seedha openSettings.
+  expect(Linking.openSettings).toHaveBeenCalled()
+  expect(Linking.sendIntent).not.toHaveBeenCalled()
+})
+
+test('iOS par koi bhi issue ho, app ka page Linking.openSettings se hi khulta hai', () => {
+  Platform.OS = 'ios'
+  const root = renderModal('gps', jest.fn(), jest.fn())
+
+  pressText(root, 'Open GPS settings')
+
+  expect(Linking.openSettings).toHaveBeenCalled()
+  expect(Linking.sendIntent).not.toHaveBeenCalled() // iOS par intent nahi
 })
 
 test('"Close" band karta hai — kuch khulta nahi, wapas aane par bhi kuch nahi', () => {
@@ -224,6 +241,7 @@ test('"Close" band karta hai — kuch khulta nahi, wapas aane par bhi kuch nahi'
 
   expect(onClose).toHaveBeenCalledTimes(1)
   expect(Linking.sendIntent).not.toHaveBeenCalled()
+  expect(Linking.openSettings).not.toHaveBeenCalled()
 
   goForeground()
   expect(onRetry).not.toHaveBeenCalled() // manual jagah badli na jaye

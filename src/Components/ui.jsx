@@ -17,13 +17,30 @@ export function Card({ style, children }) {
   return <View style={[styles.card, style]}>{children}</View>
 }
 
-export function SectionTitle({ children, action, onAction }) {
+export function SectionTitle({ children, action, onAction, actionOpen }) {
   return (
     <View style={styles.sectionRow}>
       <Text style={styles.sectionTitle}>{children}</Text>
       {action ? (
-        <Pressable onPress={onAction} hitSlop={8} accessibilityRole="button">
-          <Text style={styles.sectionAction}>{action}</Text>
+        /* Chip jaisa — soft-gold pill + chevron: dekhne par hi pressable lage */
+        <Pressable
+          onPress={onAction}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityState={{ expanded: !!actionOpen }}
+          style={({ pressed }) => [
+            styles.sectionActionChip,
+            pressed && styles.sectionActionPressed,
+          ]}
+        >
+          <Text style={styles.sectionAction} numberOfLines={1}>
+            {action}
+          </Text>
+          <Icon
+            name={actionOpen ? ICONS.chevronUp : ICONS.chevronDown}
+            size={16}
+            color={colors.goldBright}
+          />
         </Pressable>
       ) : null}
     </View>
@@ -185,10 +202,25 @@ const styles = StyleSheet.create({
     letterSpacing: 1.6,
     textTransform: 'uppercase',
   },
+  sectionActionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.goldSoft,
+    borderWidth: 1,
+    borderColor: colors.goldLine,
+    borderRadius: radius.pill,
+    paddingVertical: 4,
+    paddingHorizontal: spacing.s + 2,
+    flexShrink: 0,
+  },
+  sectionActionPressed: {
+    opacity: 0.55,
+  },
   sectionAction: {
     fontSize: 13,
     fontWeight: '700',
-    color: colors.gold,
+    color: colors.goldBright,
   },
   button: {
     backgroundColor: colors.gold,

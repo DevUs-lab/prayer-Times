@@ -47,15 +47,16 @@ export async function getUserLocation() {
  * GPS/permission issue ke mutabiq sahi page kholein: permission ke liye app
  * ka page, GPS band hone par Location (switches) wala page. (Modal isay
  * "Open settings" button se bulata hai.)
+ *
+ * App ka page `Linking.openSettings()` se — APPLICATION_DETAILS_SETTINGS
+ * intent ko package ka naam chahiye hota hai, wo na dene par ya to kuch
+ * nahi khulta ya sirf apps ki list khul jati hai.
  */
 export function openLocationSettings(issue) {
-    if (Platform.OS !== 'android') {
+    if (Platform.OS !== 'android' || issue === 'permission') {
         Linking.openSettings().catch(() => {})
         return
     }
-    const intent =
-        issue === 'permission'
-            ? 'android.settings.APPLICATION_DETAILS_SETTINGS'
-            : 'android.settings.LOCATION_SOURCE_SETTINGS'
-    Linking.sendIntent(intent).catch(() => {})
+    // GPS band: seedha Location wale (switches) page par behtar.
+    Linking.sendIntent('android.settings.LOCATION_SOURCE_SETTINGS').catch(() => {})
 }

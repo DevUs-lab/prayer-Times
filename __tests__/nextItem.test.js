@@ -111,10 +111,11 @@ describe('computeNextItem', () => {
   test('before Fajr the night markers of last night are still running', () => {
     const result = next(1, 0)
 
-    // Nisf al-Layl started at 00:47 and runs until the aakhri third at 02:15,
-    // so at 1 a.m. the card speaks for that segment, not for a prayer.
+    // Nisf al-Layl started at 00:47 and runs until the afzal time (last
+    // third) at 02:15, so at 1 a.m. the card speaks for that segment, not
+    // for a prayer.
     expect(result.current.label).toBe('Nisf al-Layl')
-    expect(result.target.label).toBe('Aakhri third')
+    expect(result.target.label).toBe('Afzal time of night')
     expect(result.caption).toBe('Nisf al-Layl ends in')
     expect(result.nextPrayer.label).toBe('Fajr')
     expect(result.progress).toBeGreaterThan(0)
@@ -130,7 +131,7 @@ describe('computeNextItem', () => {
 
     const afterMidnight = computeNextItem(windows(), events(), TOMORROW_FAJR, at(1, 30))
     expect(afterMidnight.current.label).toBe('Nisf al-Layl')
-    expect(afterMidnight.target.label).toBe('Aakhri third')
+    expect(afterMidnight.target.label).toBe('Afzal time of night')
   })
 
   test('Roman Urdu keeps the legacy caption ("Zuhr ka waqt khatam hone mein")', () => {
