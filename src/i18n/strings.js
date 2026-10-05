@@ -95,7 +95,8 @@ const en = {
   'all.times.duhaKubra': '4 rak’ah',
   'all.times.midnight': 'Half the night',
   'all.times.lastthird': 'Tahajjud time',
-  'all.note': 'Shafi timings follow Dawat-e-Islami tables · rulings from Hanafi books',
+  'all.times.chasht': 'Salat al-Duha',
+  // 'all.note': 'Shafi timings follow Dawat-e-Islami tables · rulings from Hanafi books',
   'home.weather.title': 'Weather',
   'home.weather.none': 'Weather not available yet',
   'home.weather.feels': 'Feels like',
@@ -262,7 +263,8 @@ const ur = {
   'all.times.duhaKubra': 'چار رکعت',
   'all.times.midnight': 'رات کا درمیانہ',
   'all.times.lastthird': 'تہجد کا وقت',
-  'all.note': 'شافعی اوقات دعوتِ اسلامی کی فہرست جیسے · احکام حنفی کتب سے',
+  'all.times.chasht': 'نمازِ دوحا',
+  // 'all.note': 'شافعی اوقات دعوتِ اسلامی کی فہرست جیسے · احکام حنفی کتب سے',
   'home.weather.title': 'موسم',
   'home.weather.none': 'موسم ابھی دستیاب نہیں',
   'home.weather.feels': 'محسوس ہوتا ہے',
@@ -420,7 +422,8 @@ const hi = {
   'all.times.duhaKubra': 'चार रक्अत',
   'all.times.midnight': 'आधी रात',
   'all.times.lastthird': 'तहज्जुद का वक़्त',
-  'all.note': 'शाफ़िई समय दावत-ए-इस्लामी की तालिक़ा जैसे · अहकाम हनफ़ी किताबों से',
+  'all.times.chasht': 'दोहा की नमाज़',
+  // 'all.note': 'शाफ़िई समय दावत-ए-इस्लामी की तालिक़ा जैसे · अहकाम हनफ़ी किताबों से',
   'home.weather.title': 'मौसम',
   'home.weather.none': 'मौसम अभी उपलब्ध नहीं',
   'home.weather.feels': 'महसूस होता है',
@@ -565,7 +568,8 @@ const rom = {
   'all.times.duhaKubra': 'Chaar rak’ah',
   'all.times.midnight': 'Raat ka darmiyan',
   'all.times.lastthird': 'Tahajjud ka waqt',
-  'all.note': 'Shafi auqat Dawat-e-Islami jaisi table se · ahkam Hanafi kitabon se',
+  'all.times.chasht': 'Namaz-e-Duha',
+  // 'all.note': 'Shafi auqat Dawat-e-Islami jaisi table se · ahkam Hanafi kitabon se',
 
   'caption.endsIn': '{{name}} ka waqt khatam hone mein',
 
@@ -655,7 +659,7 @@ export const PRAYER_SUBS = {
   Dhuhr: { en: 'Noon', ur: 'دوپہر', hi: 'दोपहर', rom: 'Zuhr' },
   Asr: { en: 'Hanafi', ur: 'حنفی عصر', hi: 'हनफ़ी असर', rom: 'Asr (Hanafi)' },
   Maghrib: { en: 'Sunset', ur: 'سورج گرتا ہے', hi: 'सूर्यास्त', rom: 'Maghrib' },
-  Isha: { en: 'Night', ur: 'رات کی نماز', hi: 'रात की नमाज़', rom: 'Isha (Hanafi)' },
+  Isha: { en: 'Hanafi', ur: 'حنفی عشاء', hi: 'हनफ़ी इशा', rom: 'Isha (Hanafi)' },
 }
 
 /** Day events: Latin labels live on the item; these add the other scripts. */
@@ -664,6 +668,7 @@ export const EVENT_NAMES = {
   ishraq: { ur: 'اشراق', hi: 'इशराक' },
   duhaSughra: { ur: 'ضحیٰ سغراٰ', hi: 'ज़ोहा-ए-सुघरा' },
   duhaKubra: { ur: 'ضحیٰ کبریٰ', hi: 'ज़ोहा-ए-कुबरा' },
+  chasht: { ur: 'چاشت کا وقت', hi: 'चाश्त का वक़्त' }, // sirf All-times list, NEXT card nahi
   zawal: { ur: 'زوال (مکروہ)', hi: 'ज़वाल (मक्रूह)' },
   midnight: { ur: 'نصف اللیل', hi: 'निस्फ़ अल-लैल' },
   lastthird: { ur: 'تیسرا حصہ', hi: 'तीसरा हिस्सा' },

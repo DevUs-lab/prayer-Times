@@ -201,6 +201,9 @@ const styles = StyleSheet.create({
     color: colors.gold,
     letterSpacing: 1.6,
     textTransform: 'uppercase',
+    // Action chip flexShrink:0 hai (poora dikhe) — title shrink kar ke wrap
+    // ho jaye, warna chhoti screen / lambi zubaan par row card se bahar nikle.
+    flexShrink: 1,
   },
   sectionActionChip: {
     flexDirection: 'row',

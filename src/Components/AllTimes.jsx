@@ -11,8 +11,8 @@ import { buildAllTimesList, dayEpochNow } from '../Screens/Services/prayerTimes'
  * "All times" — Home ke prayer-table ki EZAFATI view (modal nahi): poora din
  * EK hi sorted list mein, table ke hi style ki rows ke saath —
  *
- *   Fajr · guraiz · Sunrise · guraiz · Ishraq · Duha-e-Kubra · guraiz ·
- *   Dhuhr · Asr (Shafi pehle, phir Hanafi) · guraiz · Maghrib ·
+ *   Fajr · guraiz · Sunrise · guraiz · Ishraq · Chasht · Duha-e-Kubra ·
+ *   guraiz · Dhuhr · Asr (Shafi pehle, phir Hanafi) · guraiz · Maghrib ·
  *   Isha (Shafi, phir Hanafi) · Nisf al-Layl · Afzal time of night
  *
  * SectionTitle ka action ("All times" ⇄ "Show five prayers") ise expand /
@@ -101,7 +101,7 @@ export default function AllTimesPanel({
         )
       })}
 
-      <Text style={styles.note}>{t('all.note')}</Text>
+      {/* <Text style={styles.note}>{t('all.note')}</Text> */}
     </>
   )
 }

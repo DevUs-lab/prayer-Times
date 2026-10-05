@@ -288,9 +288,10 @@ test('buildAllTimesList: sab waqt ek sorted list — duplicate events nahi, raat
   })
 
   // talu (Sunrise row), zawal (guraiz row) aur duhaSughra (Ishraq se merge)
-  // — list mein alag entry nahi bante
+  // — list mein alag entry nahi bante; Chasht yahin synth hoti hai
   expect(rows.filter((row) => row.kind === 'event').map((row) => row.item.key)).toEqual([
     'ishraq',
+    'chasht',
     'duhaKubra',
     'midnight',
     'lastthird',
@@ -331,9 +332,9 @@ test('panel prayer-table wali rows use karta hai — koi modal, koi boxed block 
   expect(root.findAllByType(Modal)).toHaveLength(0)
   expect(texts(root)).not.toContain('All prayer times')
 
-  // rows ab table ki hain: flat hairline rows (paddingVertical 11) — 16 waqt
+  // rows ab table ki hain: flat hairline rows (paddingVertical 11) — 17 waqt
   const rows = styled(root, 'paddingVertical', 11)
-  expect(rows).toHaveLength(6 + 2 + 4 + 4) // prayers + school + events + guraiz
+  expect(rows).toHaveLength(6 + 2 + 5 + 4) // prayers + school + events + guraiz
   rows.forEach((row) => {
     expect(StyleSheet.flatten(row.props.style).flexDirection).toBe('row')
   })
@@ -364,6 +365,7 @@ test('panel poora din waqt ke order mein dikhata hai — Fajr se Afzal waqt tak'
   expect(joined).toContain('Sunrise Sun rises 6:04:22 AM 11:59:27 AM')
   expect(joined).toContain('Makruh Sunrise → +20 min 6:04:22 AM 6:24:22 AM')
   expect(joined).toContain('Ishraq 2 rak’ah nafl 6:24:22 AM 9:02:22 AM')
+  expect(joined).toContain('Chasht time Salat al-Duha 6:24:22 AM 11:49:27 AM')
   expect(joined).toContain('Duha-e-Kubra 4 rak’ah 9:02:22 AM 11:49:27 AM')
   expect(joined).toContain('Makruh Zawal → Dhuhr 11:49:27 AM 11:59:27 AM')
   expect(joined).toContain('Dhuhr Noon 11:59:27 AM 4:13:06 PM')
@@ -392,6 +394,7 @@ test('sorted method: har waqt apni jagah — guraiz beech mein, raat lastthird p
     'Sunrise',
     'Sunrise → +20 min', // suraj ke 20 minute
     'Ishraq', // uske baad Ishraq
+    'Chasht time', // Salat al-Duha: shuruq+20 → zawal (Ishraq ke saath hi)
     'Duha-e-Kubra',
     'Zawal → Dhuhr',
     'Dhuhr',
@@ -418,7 +421,7 @@ test('Shafi waqt na ho (trust fail) to school rows chhup jaati hain, guraiz reht
   })
   const joined = texts(root).join(' ')
 
-  expect(styled(root, 'paddingVertical', 11)).toHaveLength(14) // 2 school rows kam
+  expect(styled(root, 'paddingVertical', 11)).toHaveLength(15) // 2 school rows kam
   expect(joined).not.toMatch(/Shafi \d/) // school ki line hi nahi bani
   expect(joined).toContain('Asr Hanafi 4:13:06 PM 5:54:05 PM') // table wali row phir bhi
   expect(joined).toContain('Makruh Zawal → Dhuhr 11:49:27 AM 11:59:27 AM') // guraiz ko farq nahi padta
@@ -439,6 +442,7 @@ test('chaar zubanon mein keys maujood hain (rom English inherit karta hai)', () 
     'all.times.duhaKubra',
     'all.times.midnight',
     'all.times.lastthird',
+    'all.times.chasht',
     'all.note',
   ]
   ;['en', 'ur', 'hi', 'rom'].forEach((lang) => {
@@ -503,6 +507,8 @@ test('Home: "All times" poora din kholta hai, "Show five prayers" paanch + sunri
     expect(open).toContain('STARTS') // head zinda hai
     expect(open).toContain('Fajr Dawn 4:45:34 AM 6:04:22 AM') // table ki row bhi list mein
     expect(open).toContain('Fajr → sunrise (nafl)') // guraiz sorted, chhoti sub
+    expect(open).toContain('Ishraq 2 rak’ah nafl 6:24:22 AM 9:02:22 AM') // sub chhoti
+    expect(open).toContain('Chasht time Salat al-Duha 6:24:22 AM 11:49:27 AM') // Duha poora
     expect(open).toContain('Asr Shafi 3:29:11 PM 5:54:05 PM') // service ka extras yahan tak
     expect(open).toContain('Makruh Zawal → Dhuhr 11:49:27 AM 11:59:27 AM')
     expect(open).toContain('Afzal time of night') // raat ka aakhri waqt bhi
@@ -535,6 +541,7 @@ test('15:00: guraiz/Ishraq/Duha/Dhuhr faint, future rows bright, START kabhi blu
   expect(nameColor(root, 'Makruh', 1)).toBe(colors.textFaint) // sunrise → +20
   expect(nameColor(root, 'Makruh', 2)).toBe(colors.textFaint) // zawal
   expect(nameColor(root, 'Ishraq')).toBe(colors.textFaint)
+  expect(nameColor(root, 'Chasht time')).toBe(colors.textFaint) // Duha: shuruq+20 → zawal
   expect(nameColor(root, 'Duha-e-Kubra')).toBe(colors.textFaint)
   expect(nameColor(root, 'Dhuhr')).toBe(colors.textFaint)
 

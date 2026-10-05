@@ -695,6 +695,8 @@ export function buildDayEvents(day) {
  *   • talu duplicate hai (table ki Sunrise row), zawal guraiz ki row ban
  *     chuka hai, duhaSughra Ishraq se merge (uska start Ishraq hi hai)
  *   • Ishraq ka end = Duha-e-Sughra ka end, jaise buildTimeline karta hai
+ *   • Chasht (Salat al-Duha): shuruq +20 → zawal — poori Duha ki khidmat.
+ *     Yahin synth hoti hai (guraiz ki tarah), NEXT card nahi badalti
  *   • trust fail? extras.asrShafi/ishaShafi null → school row banti hi nahi
  *
  * Entry: `{ id, kind: 'prayer'|'school'|'event'|'makruh', time, end, item,
@@ -772,6 +774,23 @@ export function buildAllTimesList({ windows = [], events = [], extras = {} }) {
   }
   if (asr && asr.time && maghrib && maghrib.time) {
     add('makruh', asr.time, maghrib.time, { id: 'makruh-asr', subKey: 'all.makruh.asr' })
+  }
+
+  // 5. Chasht (Salat al-Duha) — poori Duha ki khidmat: shuruq +20 se zawal
+  //    tak (Hanafi books: Duha ka aghaz ~20 min baad, ikhtitas zawal par).
+  //    Sirf is list ke liye — NEXT card ka hisaab buildDayEvents chalata
+  //    hai, usmein iska koi entry nahi (jaise guraiz ke khitte).
+  if (sunrise && sunrise.time && dhuhr && dhuhr.time) {
+    add('event', shiftMinutes(sunrise.time, 20), shiftMinutes(dhuhr.time, -10), {
+      item: {
+        key: 'chasht',
+        label: 'Chasht time',
+        urdu: 'چاشت',
+        icon: 'weather-partly-cloudy',
+        isPrayer: false,
+      },
+      subKey: 'all.times.chasht',
+    })
   }
 
   entries.sort((a, b) => a.epoch - b.epoch || a.priority - b.priority)

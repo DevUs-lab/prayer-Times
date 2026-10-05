@@ -252,7 +252,7 @@ test('Roman Urdu mode speaks the legacy captions and headings again', async () =
     expect(rendered).toContain('Zuhr ka waqt khatam hone mein')
     expect(rendered).toContain('Zuhr') // Dhuhr's Roman-Urdu sublabel
     expect(rendered).toContain('baqi waqt')
-    expect(rendered).toContain('Aaj ki nawazein · Hanafi Asr')
+    expect(rendered).toContain('Aaj ki nawazein') // section title (Hanafi-suffix user ne hata diya)
     expect(rendered).not.toContain('Dhuhr ends in')
   } finally {
     setActiveLang('en')
